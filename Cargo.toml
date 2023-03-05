@@ -13,7 +13,7 @@ actix-web = { version = "~4" }
 actix-toolbox = { version = "~0.9", features = ["logging"] }
 
 # Hashing
-argon2 = { version = "~0.4" }
+argon2 = { version = "~0.5" }
 
 # Logging facade
 log = { version = "~0.4" }
