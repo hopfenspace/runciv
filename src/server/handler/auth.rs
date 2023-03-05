@@ -6,10 +6,12 @@ use actix_web::{get, post, HttpResponse};
 use argon2::password_hash::Error;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use chrono::Utc;
+use log::error;
 use rorm::{query, update, Database, Model};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
+use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::Account;
 use crate::server::handler::{ApiError, ApiResult};
 
@@ -87,8 +89,20 @@ pub(crate) async fn login(
     ),
 )]
 #[get("/logout")]
-pub(crate) async fn logout(session: Session) -> ApiResult<HttpResponse> {
+pub(crate) async fn logout(
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
     session.purge();
+
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::CloseSocket(uuid))
+        .await
+    {
+        error!("Could not send to ws manager chan: {err}");
+    }
 
     Ok(HttpResponse::Ok().finish())
 }

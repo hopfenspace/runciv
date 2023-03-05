@@ -21,7 +21,7 @@ impl Modify for SecurityAddon {
 /// Helper struct for the openapi definitions.
 #[derive(OpenApi)]
 #[openapi(
-    paths(handler::register_account, handler::login, handler::logout),
+    paths(handler::register_account, handler::login, handler::logout, handler::websocket),
     components(schemas(
         handler::AccountRegistrationRequest,
         handler::ApiErrorResponse,

@@ -14,10 +14,11 @@ use tokio::sync::Mutex;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
-use crate::server::handler::{login, logout, register_account};
-use crate::server::middleware::{handle_not_found, json_extractor_error};
+use crate::server::handler::{login, logout, register_account, websocket};
+use crate::server::middleware::{handle_not_found, json_extractor_error, AuthenticationRequired};
 use crate::server::swagger::ApiDoc;
 
 pub mod error;
@@ -34,7 +35,13 @@ pub type FileData = Data<Mutex<HashMap<String, Vec<u8>>>>;
 ///
 /// **Parameter**:
 /// - `config`: Reference to a [Config] struct
-pub async fn start_server(config: &Config, db: Database) -> Result<(), StartServerError> {
+/// - `db`: [Database]
+/// - `ws_manager_chan`: [WsManagerChan] : The channel to manage websocket connections
+pub async fn start_server(
+    config: &Config,
+    db: Database,
+    ws_manager_chan: WsManagerChan,
+) -> Result<(), StartServerError> {
     let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
 
     info!("Starting to listen on {}", s_addr);
@@ -47,12 +54,18 @@ pub async fn start_server(config: &Config, db: Database) -> Result<(), StartServ
             .app_data(JsonConfig::default().error_handler(json_extractor_error))
             .app_data(file_data.clone())
             .app_data(Data::new(db.clone()))
+            .app_data(Data::new(ws_manager_chan.clone()))
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
             .wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_not_found))
             .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
             .service(register_account)
             .service(scope("/api/v2/auth").service(login).service(logout))
+            .service(
+                scope("/api/v1")
+                    .wrap(AuthenticationRequired)
+                    .service(websocket),
+            )
     })
     .bind(s_addr)?
     .run()

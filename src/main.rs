@@ -15,9 +15,11 @@ use clap::{Parser, Subcommand};
 use log::{error, info};
 use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
 
+use crate::chan::start_ws_manager;
 use crate::config::Config;
 use crate::server::start_server;
 
+pub mod chan;
 pub mod config;
 pub mod models;
 pub mod server;
@@ -55,7 +57,9 @@ async fn main() -> Result<(), String> {
             let db = get_db(&conf).await?;
             info!("Connected to database");
 
-            if let Err(err) = start_server(&conf, db).await {
+            let ws_manager_chan = start_ws_manager().await?;
+
+            if let Err(err) = start_server(&conf, db, ws_manager_chan).await {
                 error!("Error while starting server: {err}");
                 return Err(err.to_string());
             }
