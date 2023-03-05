@@ -1,0 +1,37 @@
+[package]
+name = "runciv"
+version = "0.1.0"
+edition = "2021"
+authors = ["Niklas Pfister <git@omikron.dev>", "gammelalf"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Web framework
+actix-web = { version = "~4" }
+# Extensions for actix-web
+actix-toolbox = { version = "~0.9", features = ["logging"] }
+
+# Hashing
+argon2 = { version = "~0.4" }
+
+# Logging facade
+log = { version = "~0.4" }
+
+# Cli parser
+clap = { version = "~4", features = ["derive"] }
+
+# Serialization
+serde = { version = "~1", features = ["derive"] }
+serde_json = { version = "~1" }
+toml = { version = "~0.7" }
+base64 = { version = "~0.21" }
+libflate = { version = "1" }
+
+# Async runtime
+tokio = { version = ">=1.23.1", features = ["rt-multi-thread", "sync", "macros"] }
+# Async abstractions
+futures = { version = "~0.3" }
+futures-util = "0.3"
+
+[features]
