@@ -38,6 +38,9 @@ pub(crate) enum ApiStatusCode {
     LoginFailed = 1005,
     UsernameAlreadyOccupied = 1006,
     InvalidPassword = 1007,
+    EmptyJson = 1008,
+    InvalidUsername = 1009,
+    InvalidDisplayName = 1010,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -85,6 +88,12 @@ pub enum ApiError {
     UsernameAlreadyOccupied,
     /// Invalid password (e.g. empty)
     InvalidPassword,
+    /// Found an empty json
+    EmptyJson,
+    /// Invalid username was specified (e.g. empty)
+    InvalidUsername,
+    /// Invalid display name was specified (e.g. empty)
+    InvalidDisplayName,
 
     /// Unknown error occurred
     InternalServerError,
@@ -119,6 +128,9 @@ impl Display for ApiError {
             }
             ApiError::SessionCorrupt => write!(f, "Corrupt session"),
             ApiError::InvalidPassword => write!(f, "Invalid password"),
+            ApiError::EmptyJson => write!(f, "Empty json found"),
+            ApiError::InvalidUsername => write!(f, "Invalid username"),
+            ApiError::InvalidDisplayName => write!(f, "Invalid display name"),
         }
     }
 }
@@ -225,6 +237,27 @@ impl actix_web::ResponseError for ApiError {
                 debug!("Invalid password specified");
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
                     ApiStatusCode::InvalidPassword,
+                    self.to_string(),
+                ))
+            }
+            ApiError::EmptyJson => {
+                debug!("Empty json found in request");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::EmptyJson,
+                    self.to_string(),
+                ))
+            }
+            ApiError::InvalidUsername => {
+                debug!("Invalid username specified");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::InvalidUsername,
+                    self.to_string(),
+                ))
+            }
+            ApiError::InvalidDisplayName => {
+                debug!("Invalid display name specified");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::InvalidDisplayName,
                     self.to_string(),
                 ))
             }

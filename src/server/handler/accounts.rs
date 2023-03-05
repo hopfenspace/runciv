@@ -2,7 +2,7 @@
 
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
-use actix_web::{delete, get, post, HttpResponse};
+use actix_web::{delete, get, post, put, HttpResponse};
 use argon2::password_hash::{Error, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use log::error;
@@ -209,6 +209,82 @@ pub async fn set_password(
         .transaction(&mut tx)
         .condition(Account::F.uuid.equals(&uuid))
         .set(Account::F.password_hash, &password_hash)
+        .exec()
+        .await?;
+
+    tx.commit().await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Update account request data
+///
+/// All parameter are optional, but at least one of them is required.
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateAccountRequest {
+    #[schema(example = "user321")]
+    username: Option<String>,
+    #[schema(example = "Heeeerbeeeert")]
+    display_name: Option<String>,
+}
+
+/// Updates the currently logged-in account
+///
+/// All parameter are optional, but at least one of them is required.
+#[utoipa::path(
+    tag = "Accounts",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Account has been updated"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    request_body = UpdateAccountRequest,
+    security(("api_key" = []))
+)]
+#[put("/accounts/me")]
+pub async fn update_me(
+    req: Json<UpdateAccountRequest>,
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    let mut ub = update!(&db, Account)
+        .condition(Account::F.uuid.equals(&uuid))
+        .begin_dyn_set();
+
+    if let Some(username) = &req.username {
+        if username.is_empty() {
+            return Err(ApiError::InvalidUsername);
+        }
+
+        if query!(&db, Account)
+            .transaction(&mut tx)
+            .condition(Account::F.username.equals(username))
+            .optional()
+            .await?
+            .is_some()
+        {
+            return Err(ApiError::UsernameAlreadyOccupied);
+        }
+
+        ub = ub.set(Account::F.username, username);
+    }
+
+    if let Some(display_name) = &req.display_name {
+        if display_name.is_empty() {
+            return Err(ApiError::InvalidDisplayName);
+        }
+
+        ub = ub.set(Account::F.display_name, display_name);
+    }
+
+    ub.transaction(&mut tx)
+        .finish_dyn_set()
+        .map_err(|_| ApiError::EmptyJson)?
         .exec()
         .await?;
 

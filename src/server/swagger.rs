@@ -25,6 +25,7 @@ impl Modify for SecurityAddon {
         handler::register_account,
         handler::get_me,
         handler::delete_me,
+        handler::update_me,
         handler::set_password,
         handler::login,
         handler::logout,
@@ -37,6 +38,7 @@ impl Modify for SecurityAddon {
         handler::LoginRequest,
         handler::AccountResponse,
         handler::SetPasswordRequest,
+        handler::UpdateAccountRequest,
     )),
     modifiers(&SecurityAddon)
 )]
