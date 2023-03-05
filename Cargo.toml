@@ -10,7 +10,12 @@ authors = ["Niklas Pfister <git@omikron.dev>", "gammelalf"]
 # Web framework
 actix-web = { version = "~4" }
 # Extensions for actix-web
-actix-toolbox = { version = "~0.9", features = ["logging"] }
+actix-toolbox = { version = "~0.9", features = ["logging", "ws"] }
+
+# openapi swagger
+utoipa = { version = "~3", features = ["actix_extras", "repr", "chrono", "uuid", "openapi_extensions", "preserve_order"] }
+# openapi swagger boilerplat generation
+utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 
 # Hashing
 argon2 = { version = "~0.5" }
@@ -23,10 +28,16 @@ clap = { version = "~4", features = ["derive"] }
 
 # Serialization
 serde = { version = "~1", features = ["derive"] }
+serde_repr = { version = "~0.1" }
 serde_json = { version = "~1" }
 toml = { version = "~0.7" }
-base64 = { version = "~0.21" }
-libflate = { version = "1" }
+# Time library
+chrono = { version = ">=0.4.20", features = ["serde"] }
+# Bytes abstractions for network usage
+bytes = { version = "~1" }
+
+# ORM
+rorm = { version = "~0.4", features = ["tokio-rustls"] }
 
 # Async runtime
 tokio = { version = ">=1.23.1", features = ["rt-multi-thread", "sync", "macros"] }
