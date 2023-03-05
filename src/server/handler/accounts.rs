@@ -2,15 +2,17 @@
 
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
-use actix_web::{get, post, HttpResponse};
+use actix_web::{delete, get, post, HttpResponse};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use log::error;
 use rand::thread_rng;
 use rorm::{insert, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::{Account, AccountInsert};
 use crate::server::handler::{ApiError, ApiResult};
 
@@ -108,4 +110,41 @@ pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<Acco
         username: account.username,
         display_name: account.display_name,
     }))
+}
+
+/// Deletes the currently logged-in account
+#[utoipa::path(
+    tag = "Accounts",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Deleted the currently logged-in account"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
+#[delete("/accounts/me")]
+pub async fn delete_me(
+    db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    rorm::delete!(&db, Account)
+        .condition(Account::F.uuid.equals(&uuid))
+        .await?;
+
+    // Clear the current session
+    session.purge();
+
+    // Close open websocket connections
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::CloseSocket(uuid))
+        .await
+    {
+        error!("Could not send to ws manager chan: {err}");
+    }
+
+    Ok(HttpResponse::Ok().finish())
 }

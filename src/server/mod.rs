@@ -17,7 +17,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
-use crate::server::handler::{get_me, login, logout, register_account, websocket};
+use crate::server::handler::{delete_me, get_me, login, logout, register_account, websocket};
 use crate::server::middleware::{handle_not_found, json_extractor_error, AuthenticationRequired};
 use crate::server::swagger::ApiDoc;
 
@@ -65,7 +65,8 @@ pub async fn start_server(
                 scope("/api/v1")
                     .wrap(AuthenticationRequired)
                     .service(websocket)
-                    .service(get_me),
+                    .service(get_me)
+                    .service(delete_me),
             )
     })
     .bind(s_addr)?

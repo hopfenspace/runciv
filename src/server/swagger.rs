@@ -24,6 +24,7 @@ impl Modify for SecurityAddon {
     paths(
         handler::register_account,
         handler::get_me,
+        handler::delete_me,
         handler::login,
         handler::logout,
         handler::websocket
