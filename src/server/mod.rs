@@ -65,7 +65,7 @@ pub async fn start_server(
             .service(version)
             .service(scope("/api/v2/auth").service(login).service(logout))
             .service(
-                scope("/api/v1")
+                scope("/api/v2")
                     .wrap(AuthenticationRequired)
                     .service(websocket)
                     .service(get_me)
