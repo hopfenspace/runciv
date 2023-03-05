@@ -20,6 +20,9 @@ pub struct Account {
     /// The password hash of the user.
     #[rorm(max_length = 1024)]
     pub password_hash: String,
+
+    /// The last time the user has logged in
+    pub last_login: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Patch)]
@@ -29,4 +32,5 @@ pub(crate) struct AccountInsert {
     pub(crate) username: String,
     pub(crate) display_name: String,
     pub(crate) password_hash: String,
+    pub(crate) last_login: Option<chrono::NaiveDateTime>,
 }

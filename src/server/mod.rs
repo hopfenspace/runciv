@@ -4,7 +4,8 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use actix_toolbox::tb_middleware::{setup_logging_mw, LoggingMiddlewareConfig};
-use actix_web::middleware::Compress;
+use actix_web::http::StatusCode;
+use actix_web::middleware::{Compress, ErrorHandlers};
 use actix_web::web::{scope, Data, JsonConfig, PayloadConfig};
 use actix_web::{App, HttpServer};
 use log::info;
@@ -15,11 +16,13 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
 use crate::server::error::StartServerError;
-use crate::server::handler::register_account;
+use crate::server::handler::{login, logout, register_account};
+use crate::server::middleware::{handle_not_found, json_extractor_error};
 use crate::server::swagger::ApiDoc;
 
 pub mod error;
 pub mod handler;
+pub mod middleware;
 pub mod swagger;
 
 /// This type holds the file data of the game.
@@ -41,13 +44,15 @@ pub async fn start_server(config: &Config, db: Database) -> Result<(), StartServ
     HttpServer::new(move || {
         App::new()
             .app_data(PayloadConfig::default())
-            .app_data(JsonConfig::default())
+            .app_data(JsonConfig::default().error_handler(json_extractor_error))
             .app_data(file_data.clone())
             .app_data(Data::new(db.clone()))
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
+            .wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_not_found))
             .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
-            .service(scope("/api/v2").service(register_account))
+            .service(register_account)
+            .service(scope("/api/v2/auth").service(login).service(logout))
     })
     .bind(s_addr)?
     .run()

@@ -26,8 +26,7 @@ pub struct AccountRegistrationRequest {
 
 /// Register a new account
 #[utoipa::path(
-    tag = "Accounts", 
-    context_path = "/api/v2", 
+    tag = "Accounts",
     responses(
         (status = 200, description = "Account got created"),
         (status = 400, description = "Client error", body = ApiErrorResponse),
@@ -35,7 +34,7 @@ pub struct AccountRegistrationRequest {
     ),
     request_body = AccountRegistrationRequest,
 )]
-#[post("/accounts/register")]
+#[post("/api/v2/accounts/register")]
 pub async fn register_account(
     req: Json<AccountRegistrationRequest>,
     db: Data<Database>,
@@ -65,6 +64,7 @@ pub async fn register_account(
             username: req.username.clone(),
             display_name: req.display_name.clone(),
             password_hash,
+            last_login: None,
         })
         .await?;
 
