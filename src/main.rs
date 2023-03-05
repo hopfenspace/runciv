@@ -44,6 +44,7 @@ pub struct Cli {
     command: Command,
 }
 
+#[rorm::rorm_main]
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let cli = Cli::parse();

@@ -1,0 +1,86 @@
+[Migration]
+Hash = '3801360102409301020'
+Initial = true
+Replaces = []
+
+[[Migration.Operations]]
+Type = 'CreateModel'
+Name = 'account'
+
+[[Migration.Operations.Fields]]
+Name = 'uuid'
+Type = 'varbinary'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'primary_key'
+
+[[Migration.Operations.Fields]]
+Name = 'username'
+Type = 'varchar'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'max_length'
+Value = 255
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'unique'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'not_null'
+
+[[Migration.Operations.Fields]]
+Name = 'display_name'
+Type = 'varchar'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'max_length'
+Value = 255
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'not_null'
+
+[[Migration.Operations.Fields]]
+Name = 'password_hash'
+Type = 'varchar'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'max_length'
+Value = 1024
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'not_null'
+
+[[Migration.Operations.Fields]]
+Name = 'last_login'
+Type = 'datetime'
+Annotations = []
+
+[[Migration.Operations]]
+Type = 'CreateModel'
+Name = 'dbsession'
+
+[[Migration.Operations.Fields]]
+Name = 'session_key'
+Type = 'varchar'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'max_length'
+Value = 4096
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'primary_key'
+
+[[Migration.Operations.Fields]]
+Name = 'session_state'
+Type = 'varchar'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'max_length'
+Value = 1048576
+
+[[Migration.Operations.Fields]]
+Name = 'expired_after'
+Type = 'datetime'
+
+[[Migration.Operations.Fields.Annotations]]
+Type = 'not_null'

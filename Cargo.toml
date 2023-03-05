@@ -50,3 +50,4 @@ futures = { version = "~0.3" }
 futures-util = "0.3"
 
 [features]
+rorm-main = []
