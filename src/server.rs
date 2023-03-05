@@ -13,8 +13,6 @@ use log::info;
 use tokio::sync::Mutex;
 
 use crate::config::Config;
-use crate::handler::files::{get_file, put_file};
-use crate::handler::is_alive::is_alive;
 
 /// The errors that can occur during server startup
 #[derive(Debug)]
@@ -60,9 +58,6 @@ pub async fn start_server(config: &Config) -> Result<(), StartServerError> {
             .app_data(file_data.clone())
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
-            .service(is_alive)
-            .service(get_file)
-            .service(put_file)
     })
     .bind(s_addr)?
     .run()
