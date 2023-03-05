@@ -2,6 +2,13 @@
 ListenAddress = "127.0.0.1"
 ListenPort = 8080
 
+[Database]
+Host = "127.0.0.1"
+Port = 5432
+Name = "runciv"
+User = "runciv"
+Password = "super-secure-password"
+
 [Logging]
 LogLevel = "info"
 Path = "/var/log/runciv/main.log"

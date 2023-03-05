@@ -15,6 +15,22 @@ pub struct ServerConfig {
     pub listen_port: u16,
 }
 
+/// Configuration regarding the database
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct DBConfig {
+    /// Host the database is located on
+    pub host: String,
+    /// Port the database is located on
+    pub port: u16,
+    /// The name of the database to connect to.
+    pub name: String,
+    /// The username to use for the database connection
+    pub user: String,
+    /// The password to use for the database connection
+    pub password: String,
+}
+
 /// This struct can be parsed from the configuration file
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "PascalCase")]
@@ -23,4 +39,6 @@ pub struct Config {
     pub server: ServerConfig,
     /// The logging configuration
     pub logging: LoggingConfig,
+    /// The database configuration
+    pub database: DBConfig,
 }
