@@ -37,6 +37,7 @@ pub(crate) enum ApiStatusCode {
 
     LoginFailed = 1005,
     UsernameAlreadyOccupied = 1006,
+    InvalidPassword = 1007,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -82,6 +83,8 @@ pub enum ApiError {
     LoginFailed,
     /// The username is already occupied
     UsernameAlreadyOccupied,
+    /// Invalid password (e.g. empty)
+    InvalidPassword,
 
     /// Unknown error occurred
     InternalServerError,
@@ -115,6 +118,7 @@ impl Display for ApiError {
                 write!(f, "Session error occurred")
             }
             ApiError::SessionCorrupt => write!(f, "Corrupt session"),
+            ApiError::InvalidPassword => write!(f, "Invalid password"),
         }
     }
 }
@@ -214,6 +218,13 @@ impl actix_web::ResponseError for ApiError {
 
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
                     ApiStatusCode::SessionError,
+                    self.to_string(),
+                ))
+            }
+            ApiError::InvalidPassword => {
+                debug!("Invalid password specified");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::InvalidPassword,
                     self.to_string(),
                 ))
             }

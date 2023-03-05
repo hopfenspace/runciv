@@ -3,11 +3,11 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
 use actix_web::{delete, get, post, HttpResponse};
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::password_hash::{Error, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use log::error;
 use rand::thread_rng;
-use rorm::{insert, query, Database, Model};
+use rorm::{insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -145,6 +145,74 @@ pub async fn delete_me(
     {
         error!("Could not send to ws manager chan: {err}");
     }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// The set password request data
+///
+/// The parameter `new_password` must not be empty
+#[derive(Deserialize, ToSchema)]
+pub struct SetPasswordRequest {
+    #[schema(example = "super-secure-password")]
+    old_password: String,
+    #[schema(example = "ultra-secure-password!!11!")]
+    new_password: String,
+}
+
+/// Sets a new password for the currently logged-in account
+#[utoipa::path(
+    tag = "Accounts",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "New password has been set"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    request_body = SetPasswordRequest,
+    security(("api_key" = []))
+)]
+#[post("/accounts/me/setPassword")]
+pub async fn set_password(
+    req: Json<SetPasswordRequest>,
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    if req.new_password.is_empty() {
+        return Err(ApiError::InvalidPassword);
+    }
+
+    let mut tx = db.start_transaction().await?;
+
+    let (pw_hash,) = query!(&db, (Account::F.password_hash,))
+        .transaction(&mut tx)
+        .condition(Account::F.uuid.equals(&uuid))
+        .optional()
+        .await?
+        .ok_or(ApiError::SessionCorrupt)?;
+
+    Argon2::default()
+        .verify_password(req.old_password.as_bytes(), &PasswordHash::new(&pw_hash)?)
+        .map_err(|e| match e {
+            Error::Password => ApiError::LoginFailed,
+            _ => ApiError::InvalidHash(e),
+        })?;
+
+    let salt = SaltString::generate(&mut thread_rng());
+    let password_hash = Argon2::default()
+        .hash_password(req.new_password.as_bytes(), &salt)?
+        .to_string();
+
+    update!(&db, Account)
+        .transaction(&mut tx)
+        .condition(Account::F.uuid.equals(&uuid))
+        .set(Account::F.password_hash, &password_hash)
+        .exec()
+        .await?;
+
+    tx.commit().await?;
 
     Ok(HttpResponse::Ok().finish())
 }

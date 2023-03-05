@@ -25,9 +25,10 @@ impl Modify for SecurityAddon {
         handler::register_account,
         handler::get_me,
         handler::delete_me,
+        handler::set_password,
         handler::login,
         handler::logout,
-        handler::websocket
+        handler::websocket,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -35,6 +36,7 @@ impl Modify for SecurityAddon {
         handler::ApiStatusCode,
         handler::LoginRequest,
         handler::AccountResponse,
+        handler::SetPasswordRequest,
     )),
     modifiers(&SecurityAddon)
 )]
