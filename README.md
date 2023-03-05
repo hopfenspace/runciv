@@ -1,5 +1,9 @@
 # runciv
 
+[![license](https://img.shields.io/github/license/hopfenspace/runciv?color=blue)](LICENSE)
+[![dependency status](https://deps.rs/repo/github/hopfenspace/runciv/status.svg)](https://deps.rs/repo/github/hopfenspace/runciv)
+[![ci status](https://img.shields.io/github/actions/workflow/status/myOmikron/kraken-project/linux.yml?label=CI)](https://github.com/hopfenspace/runciv/actions/workflows/linux.yml)
+
 runciv is a server for [unciv](https://github.com/yairm210/Unciv) 
 written in pure rust!
 
