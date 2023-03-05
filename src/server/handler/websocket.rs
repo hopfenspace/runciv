@@ -22,6 +22,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
 /// will be closed.
 #[utoipa::path(
     tag = "Websocket",
+    context_path = "/api/v2",
     responses(
         (status = 101, description = "Websocket is initialized"),
         (status = 400, description = "Client error", body = ApiErrorResponse),
