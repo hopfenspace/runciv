@@ -11,8 +11,11 @@ use actix_web::web::{Data, JsonConfig, PayloadConfig};
 use actix_web::{App, HttpServer};
 use log::info;
 use tokio::sync::Mutex;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
+use crate::swagger::ApiDoc;
 
 /// The errors that can occur during server startup
 #[derive(Debug)]
@@ -58,6 +61,7 @@ pub async fn start_server(config: &Config) -> Result<(), StartServerError> {
             .app_data(file_data.clone())
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
+            .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
     })
     .bind(s_addr)?
     .run()

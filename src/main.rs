@@ -16,6 +16,7 @@ use crate::server::start_server;
 pub mod config;
 pub mod handler;
 pub mod server;
+pub mod swagger;
 
 /// The possible commands for runciv
 #[derive(Subcommand)]
