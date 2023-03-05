@@ -1,12 +1,13 @@
 //! All handlers for the account endpoints live in here
 
+use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
-use actix_web::{post, HttpResponse};
+use actix_web::{get, post, HttpResponse};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use rand::thread_rng;
 use rorm::{insert, query, Database, Model};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -71,4 +72,40 @@ pub async fn register_account(
     tx.commit().await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+/// The account data
+#[derive(Serialize, ToSchema)]
+pub struct AccountResponse {
+    #[schema(example = "user123")]
+    username: String,
+    #[schema(example = "Herbert")]
+    display_name: String,
+}
+
+/// Returns the account that is currently logged-in
+#[utoipa::path(
+    tag = "Accounts",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns the account data of the current user", body = AccountResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
+#[get("/accounts/me")]
+pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<AccountResponse>> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let account = query!(&db, Account)
+        .condition(Account::F.uuid.equals(&uuid))
+        .optional()
+        .await?
+        .ok_or(ApiError::SessionCorrupt)?;
+
+    Ok(Json(AccountResponse {
+        username: account.username,
+        display_name: account.display_name,
+    }))
 }
