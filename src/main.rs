@@ -2,21 +2,25 @@
 //!
 //! runciv is a server implementation for [unciv](https://github.com/yairm210/Unciv)
 #![warn(missing_docs)]
+#![cfg_attr(
+    feature = "rorm-main",
+    allow(dead_code, unused_variables, unused_imports)
+)]
 
 use std::fs::read_to_string;
 use std::path::Path;
 
 use actix_toolbox::logging::setup_logging;
 use clap::{Parser, Subcommand};
-use log::error;
+use log::{error, info};
+use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
 
 use crate::config::Config;
 use crate::server::start_server;
 
 pub mod config;
-pub mod handler;
+pub mod models;
 pub mod server;
-pub mod swagger;
 
 /// The possible commands for runciv
 #[derive(Subcommand)]
@@ -48,7 +52,10 @@ async fn main() -> Result<(), String> {
 
             setup_logging(&conf.logging)?;
 
-            if let Err(err) = start_server(&conf).await {
+            let db = get_db(&conf).await?;
+            info!("Connected to database");
+
+            if let Err(err) = start_server(&conf, db).await {
                 error!("Error while starting server: {err}");
                 return Err(err.to_string());
             }
@@ -80,4 +87,28 @@ fn get_conf(config_path: &str) -> Result<Config, String> {
         toml::from_str(&config_str).map_err(|err| format!("Could not parse config file: {err}"))?;
 
     Ok(config)
+}
+
+/// Retrieves the database using the provided config.
+///
+/// If the connection fails, an error is returned
+async fn get_db(config: &Config) -> Result<Database, String> {
+    let c = DatabaseConfiguration {
+        driver: DatabaseDriver::Postgres {
+            host: config.database.host.clone(),
+            port: config.database.port,
+            name: config.database.name.clone(),
+            user: config.database.user.clone(),
+            password: config.database.password.clone(),
+        },
+        min_connections: 2,
+        max_connections: 20,
+        disable_logging: Some(true),
+        statement_log_level: None,
+        slow_statement_log_level: None,
+    };
+
+    Database::connect(c)
+        .await
+        .map_err(|e| format!("Error connecting to database: {e}"))
 }

@@ -1,42 +1,26 @@
 //! This module holds the server definition
 
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::io;
 use std::net::SocketAddr;
 
 use actix_toolbox::tb_middleware::{setup_logging_mw, LoggingMiddlewareConfig};
 use actix_web::middleware::Compress;
-use actix_web::web::{Data, JsonConfig, PayloadConfig};
+use actix_web::web::{scope, Data, JsonConfig, PayloadConfig};
 use actix_web::{App, HttpServer};
 use log::info;
+use rorm::Database;
 use tokio::sync::Mutex;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Config;
-use crate::swagger::ApiDoc;
+use crate::server::error::StartServerError;
+use crate::server::handler::register_account;
+use crate::server::swagger::ApiDoc;
 
-/// The errors that can occur during server startup
-#[derive(Debug)]
-pub enum StartServerError {
-    /// IO error that can occur
-    IO(io::Error),
-}
-
-impl Display for StartServerError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StartServerError::IO(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl From<io::Error> for StartServerError {
-    fn from(value: io::Error) -> Self {
-        Self::IO(value)
-    }
-}
+pub mod error;
+pub mod handler;
+pub mod swagger;
 
 /// This type holds the file data of the game.
 ///
@@ -47,7 +31,7 @@ pub type FileData = Data<Mutex<HashMap<String, Vec<u8>>>>;
 ///
 /// **Parameter**:
 /// - `config`: Reference to a [Config] struct
-pub async fn start_server(config: &Config) -> Result<(), StartServerError> {
+pub async fn start_server(config: &Config, db: Database) -> Result<(), StartServerError> {
     let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
 
     info!("Starting to listen on {}", s_addr);
@@ -59,9 +43,11 @@ pub async fn start_server(config: &Config) -> Result<(), StartServerError> {
             .app_data(PayloadConfig::default())
             .app_data(JsonConfig::default())
             .app_data(file_data.clone())
+            .app_data(Data::new(db.clone()))
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
             .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
+            .service(scope("/api/v2").service(register_account))
     })
     .bind(s_addr)?
     .run()

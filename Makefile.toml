@@ -1,0 +1,25 @@
+[tasks.cleanmodels]
+command = "rm"
+args = ["-f", ".models.json"]
+
+[tasks.genmodels]
+command = "cargo"
+args = ["run", "-r", "-F rorm-main"]
+dependencies = ["cleanmodels"]
+
+[tasks.make-migrations]
+command = "rorm-cli"
+args = ["make-migrations"]
+dependencies = ["genmodels"]
+
+[tasks.migrate]
+command = "rorm-cli"
+args = ["migrate"]
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "--release"]

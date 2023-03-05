@@ -1958,6 +1958,7 @@ dependencies = [
  "futures",
  "futures-util",
  "log",
+ "rand",
  "rorm",
  "serde",
  "serde_json",
@@ -1966,6 +1967,7 @@ dependencies = [
  "toml",
  "utoipa",
  "utoipa-swagger-ui",
+ "uuid",
 ]
 
 [[package]]

@@ -19,6 +19,8 @@ utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 
 # Hashing
 argon2 = { version = "~0.5" }
+# RNG utils
+rand = { version = "~0.8" }
 
 # Logging facade
 log = { version = "~0.4" }
@@ -35,6 +37,8 @@ toml = { version = "~0.7" }
 chrono = { version = ">=0.4.20", features = ["serde"] }
 # Bytes abstractions for network usage
 bytes = { version = "~1" }
+# UUID generation
+uuid = { version = "~1", features = ["v4"] }
 
 # ORM
 rorm = { version = "~0.4", features = ["tokio-rustls"] }
