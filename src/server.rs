@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 use crate::handler::files::{get_file, put_file};
 use crate::handler::is_alive::is_alive;
+use crate::handler::ws::start_ws;
 
 /// The errors that can occur during server startup
 #[derive(Debug)]
@@ -63,6 +64,7 @@ pub async fn start_server(config: &Config) -> Result<(), StartServerError> {
             .service(is_alive)
             .service(get_file)
             .service(put_file)
+            .service(start_ws)
     })
     .bind(s_addr)?
     .run()

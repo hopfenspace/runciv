@@ -2,3 +2,4 @@
 
 pub(crate) mod files;
 pub(crate) mod is_alive;
+pub(crate) mod ws;
