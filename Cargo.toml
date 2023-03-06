@@ -3,6 +3,8 @@ name = "runciv"
 version = "0.1.0"
 edition = "2021"
 authors = ["Niklas Pfister <git@omikron.dev>", "gammelalf"]
+license = "AGPL-3.0"
+repository = "https://github.com/hopfenspace/runciv"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
