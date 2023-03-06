@@ -75,7 +75,7 @@ pub async fn start_server(
                 SessionMiddleware::builder(DBSessionStore::new(db.clone()), key.clone())
                     .session_lifecycle(PersistentSession::session_ttl(
                         PersistentSession::default(),
-                        Duration::hours(1),
+                        Duration::hours(24),
                     ))
                     .build(),
             )
