@@ -14,7 +14,6 @@ use crate::server::handler::{ApiError, ApiResult};
 pub struct FriendResponse {
     #[schema(example = 1337)]
     id: u64,
-    is_request: bool,
     #[schema(example = "user321")]
     from: String,
     #[schema(example = "user123")]
@@ -22,18 +21,24 @@ pub struct FriendResponse {
 }
 
 /// A list of your friends and friend requests
+///
+/// `friends` is a list of already established friendships
+/// `friend_requests` is a list of friend requests (ingoing and outgoing)
 #[derive(Serialize, ToSchema)]
 pub struct GetFriendResponse {
     friends: Vec<FriendResponse>,
+    friend_requests: Vec<FriendResponse>,
 }
 
 /// Retrieve your friend and friend requests.
 ///
-/// If `is_request` is `true`, the entry is a request.
+/// `friends` is a list of already established friendships
+/// `friend_requests` is a list of friend requests (ingoing and outgoing)
 ///
-/// `from` specifies the origin of the request, `to` specifies the destination.
 ///
-/// So if you have a request with `from` equal to your username, it means you have requested a
+/// Regarding `friend_requests`:
+///
+/// If you have a request with `from` equal to your username, it means you have requested a
 /// friendship, but the destination hasn't accepted yet.
 ///
 /// In the other case, if your username is in `to`, you have received a friend request.
@@ -57,6 +62,7 @@ pub async fn get_friends(
     let mut tx = db.start_transaction().await?;
 
     let mut friends = vec![];
+    let mut friend_requests = vec![];
 
     // Retrieve all friendships
     friends.extend(
@@ -78,14 +84,13 @@ pub async fn get_friends(
         .into_iter()
         .map(|(id, from, to)| FriendResponse {
             id: id as u64,
-            is_request: false,
             from,
             to,
         }),
     );
 
     // Retrieve all incoming requests
-    friends.extend(
+    friend_requests.extend(
         query!(
             &db,
             (
@@ -106,12 +111,11 @@ pub async fn get_friends(
             id: id as u64,
             from,
             to,
-            is_request: true,
         }),
     );
 
     // Retrieve all outgoing requests
-    friends.extend(
+    friend_requests.extend(
         query!(
             &db,
             (
@@ -132,13 +136,15 @@ pub async fn get_friends(
             id: id as u64,
             from,
             to,
-            is_request: true,
         }),
     );
 
     tx.commit().await?;
 
-    Ok(Json(GetFriendResponse { friends }))
+    Ok(Json(GetFriendResponse {
+        friends,
+        friend_requests,
+    }))
 }
 
 /// The request of a new friendship
