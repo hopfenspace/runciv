@@ -23,8 +23,16 @@ After installation of `cargo`, execute:
 
 ### Build from source
 
+Install build dependencies:
+
 ```bash
-cargo build -r -p runciv
+cargo install rorm-cli cargo-make
+```
+
+Build the project.
+
+```bash
+cargo make
 ```
 
 The resulting binary will be in `target/release/runciv`.
@@ -55,6 +63,12 @@ Create a new database & database user:
 ```bash
 su - postgres -c "createuser -P runciv"
 su - postgres -c "createdb -O runciv runciv"
+```
+
+Apply the migrations:
+
+```bash
+rorm-cli migrate --database-config /etc/runciv/config.toml
 ```
 
 Copy `example.config.toml` to `/etc/runciv/config.toml` and edit the file

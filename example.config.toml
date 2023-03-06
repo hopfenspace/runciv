@@ -10,6 +10,8 @@ Port = 5432
 Name = "runciv"
 User = "runciv"
 Password = "super-secure-password"
+# This value is hardcoded for rorm-cli and can not be changed!
+Driver = "Postgres"
 
 [Logging]
 LogLevel = "info"
