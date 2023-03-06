@@ -18,17 +18,19 @@ use log::info;
 use rorm::Database;
 use tokio::sync::Mutex;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::{SwaggerUi, Url};
 
 use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
     accept_friend_request, create_friend_request, delete_friend, delete_me, get_friends, get_me,
-    login, logout, register_account, set_password, update_me, version, websocket,
+    health, login, logout, register_account, set_password, update_me, version, websocket,
 };
-use crate::server::middleware::{handle_not_found, json_extractor_error, AuthenticationRequired};
-use crate::server::swagger::ApiDoc;
+use crate::server::middleware::{
+    handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
+};
+use crate::server::swagger::{AdminApiDoc, ApiDoc};
 
 pub mod error;
 pub mod handler;
@@ -61,6 +63,11 @@ pub async fn start_server(
     info!("Starting to listen on {}", s_addr);
 
     let file_data: FileData = Data::new(Mutex::new(HashMap::new()));
+    let admin_token = config.server.admin_token.clone();
+
+    if admin_token.is_empty() {
+        return Err(StartServerError::InvalidSecretKey);
+    }
 
     HttpServer::new(move || {
         App::new()
@@ -80,10 +87,24 @@ pub async fn start_server(
                     .build(),
             )
             .wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_not_found))
-            .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
+            .service(SwaggerUi::new("/docs/{_:.*}").urls(vec![
+                (
+                    Url::new("user-api", "/api-doc/userapi.json"),
+                    ApiDoc::openapi(),
+                ),
+                (
+                    Url::new("admin-api", "/api-doc/adminapi.json"),
+                    AdminApiDoc::openapi(),
+                ),
+            ]))
             .service(register_account)
             .service(version)
             .service(scope("/api/v2/auth").service(login).service(logout))
+            .service(
+                scope("/api/v2/admin")
+                    .wrap(TokenRequired(admin_token.clone()))
+                    .service(health),
+            )
             .service(
                 scope("/api/v2")
                     .wrap(AuthenticationRequired)

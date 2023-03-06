@@ -1,17 +1,17 @@
 //! This module holds the definition of the swagger declaration
 
-use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
 use crate::server::handler;
 
-struct SecurityAddon;
+struct CookieSecurity;
 
-impl Modify for SecurityAddon {
+impl Modify for CookieSecurity {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         if let Some(components) = openapi.components.as_mut() {
             components.add_security_scheme(
-                "api_key",
+                "session_cookie",
                 SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("id"))),
             )
         }
@@ -49,6 +49,42 @@ impl Modify for SecurityAddon {
         handler::GetFriendResponse,
         handler::FriendResponse,
     )),
-    modifiers(&SecurityAddon)
+    modifiers(&CookieSecurity)
 )]
 pub struct ApiDoc;
+
+struct TokenSecurity;
+
+impl Modify for TokenSecurity {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "admin_token",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .description(Some(
+                            "The token is set in the configuration file in the server.",
+                        ))
+                        .build(),
+                ),
+            )
+        }
+    }
+}
+
+/// Helper struct for the admin openapi definitions.
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        handler::health,
+    ),
+    components(schemas(
+        handler::ApiErrorResponse,
+        handler::ApiStatusCode,
+        handler::HealthResponse,
+    )),
+    modifiers(&TokenSecurity)
+)]
+pub struct AdminApiDoc;

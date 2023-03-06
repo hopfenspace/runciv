@@ -4,8 +4,8 @@ use actix_toolbox::ws;
 use actix_toolbox::ws::Message;
 use log::error;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
@@ -62,6 +62,11 @@ pub enum WsManagerMessage {
     OpenedSocket(Vec<u8>, ws::Sender),
     /// Send a message to given uuid
     Message(Vec<u8>, WsMessage),
+    /// Retrieve the current websocket count by sending this
+    /// message to the ws manager.
+    ///
+    /// It will respond through the provided channel
+    RetrieveWsCount(oneshot::Sender<u64>),
 }
 
 /// Start the websocket manager
@@ -109,6 +114,11 @@ pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
                                 error!("Could not send to ws sender: {err}");
                             }
                         }
+                    }
+                }
+                WsManagerMessage::RetrieveWsCount(tx) => {
+                    if let Err(err) = tx.send(lookup.values().map(|s| s.len() as u64).sum()) {
+                        error!("Could not send through callback channel: {err}");
                     }
                 }
             }

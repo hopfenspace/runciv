@@ -28,7 +28,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[get("/ws")]
 pub async fn websocket(

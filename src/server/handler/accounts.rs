@@ -94,7 +94,7 @@ pub struct AccountResponse {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[get("/accounts/me")]
 pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<AccountResponse>> {
@@ -121,7 +121,7 @@ pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<Acco
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[delete("/accounts/me")]
 pub async fn delete_me(
@@ -170,7 +170,7 @@ pub struct SetPasswordRequest {
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     request_body = SetPasswordRequest,
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[post("/accounts/me/setPassword")]
 pub async fn set_password(
@@ -240,7 +240,7 @@ pub struct UpdateAccountRequest {
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     request_body = UpdateAccountRequest,
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[put("/accounts/me")]
 pub async fn update_me(

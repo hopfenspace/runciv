@@ -3,6 +3,9 @@ ListenAddress = "127.0.0.1"
 ListenPort = 8080
 # You can generate a secret key by executing: runciv keygen
 SecretKey = ""
+# The token that is as authentication used for the admin-api.
+# You can generate a one using: openssl rand -hex 24
+AdminToken = ""
 
 [Database]
 Host = "127.0.0.1"

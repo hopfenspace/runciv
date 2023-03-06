@@ -12,6 +12,8 @@ pub enum StartServerError {
     IO(io::Error),
     /// Invalid secret key was specified
     InvalidSecretKey,
+    /// Invalid admin token was found
+    InvalidAdminToken,
 }
 
 impl Display for StartServerError {
@@ -23,6 +25,7 @@ impl Display for StartServerError {
                 "Invalid parameter SecretKey.\
                     Consider using the subcommand keygen and update your configuration file"
             ),
+            StartServerError::InvalidAdminToken => write!(f, "Invalid admin token was specified"),
         }
     }
 }

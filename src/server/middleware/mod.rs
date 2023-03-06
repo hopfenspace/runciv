@@ -3,7 +3,9 @@
 pub(crate) use authentication_required::AuthenticationRequired;
 pub(crate) use handle_not_found::handle_not_found;
 pub(crate) use json_extractor_error::json_extractor_error;
+pub(crate) use token_required::TokenRequired;
 
 mod authentication_required;
 mod handle_not_found;
 mod json_extractor_error;
+mod token_required;

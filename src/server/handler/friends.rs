@@ -50,7 +50,7 @@ pub struct GetFriendResponse {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[get("/friends")]
 pub async fn get_friends(
@@ -165,7 +165,7 @@ pub struct CreateFriendRequest {
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     request_body = CreateFriendRequest,
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[post("/friends")]
 pub async fn create_friend_request(
@@ -240,7 +240,7 @@ pub struct FriendId {
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     params(FriendId),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[delete("/friends/{id}")]
 pub async fn delete_friend(
@@ -295,7 +295,7 @@ pub async fn delete_friend(
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     params(FriendId),
-    security(("api_key" = []))
+    security(("session_cookie" = []))
 )]
 #[put("/friends/{id}")]
 pub async fn accept_friend_request(

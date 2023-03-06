@@ -19,6 +19,8 @@ pub struct ServerConfig {
     ///
     /// Do not expose this key!
     pub secret_key: String,
+    /// The token to access the admin API.
+    pub admin_token: String,
 }
 
 /// Configuration regarding the database
