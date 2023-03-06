@@ -31,6 +31,7 @@ impl Modify for SecurityAddon {
         handler::logout,
         handler::websocket,
         handler::version,
+        handler::create_friend_request,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -41,6 +42,7 @@ impl Modify for SecurityAddon {
         handler::SetPasswordRequest,
         handler::UpdateAccountRequest,
         handler::VersionResponse,
+        handler::CreateFriendRequest,
     )),
     modifiers(&SecurityAddon)
 )]

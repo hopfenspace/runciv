@@ -1,4 +1,6 @@
-use rorm::{Model, Patch};
+use rorm::{BackRef, Model, Patch};
+
+use crate::models::Friend;
 
 /// A user account
 #[derive(Debug, Model)]
@@ -23,6 +25,10 @@ pub struct Account {
 
     /// The last time the user has logged in
     pub last_login: Option<chrono::NaiveDateTime>,
+
+    /// Your friends and friend requests
+    #[rorm(field = "Friend::F.to")]
+    pub friends: BackRef<Friend>,
 }
 
 #[derive(Patch)]

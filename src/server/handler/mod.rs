@@ -12,11 +12,13 @@ use utoipa::ToSchema;
 
 pub use crate::server::handler::accounts::*;
 pub use crate::server::handler::auth::*;
+pub use crate::server::handler::friends::*;
 pub use crate::server::handler::version::*;
 pub use crate::server::handler::websocket::*;
 
 mod accounts;
 mod auth;
+mod friends;
 mod version;
 mod websocket;
 
@@ -43,6 +45,8 @@ pub(crate) enum ApiStatusCode {
     EmptyJson = 1008,
     InvalidUsername = 1009,
     InvalidDisplayName = 1010,
+    FriendshipAlreadyRequested = 1011,
+    AlreadyFriends = 1012,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -96,6 +100,10 @@ pub enum ApiError {
     InvalidUsername,
     /// Invalid display name was specified (e.g. empty)
     InvalidDisplayName,
+    /// Friendship was already requested, but is not accepted yet
+    FriendshipAlreadyRequested,
+    /// Users are already friends
+    AlreadyFriends,
 
     /// Unknown error occurred
     InternalServerError,
@@ -133,6 +141,8 @@ impl Display for ApiError {
             ApiError::EmptyJson => write!(f, "Empty json found"),
             ApiError::InvalidUsername => write!(f, "Invalid username"),
             ApiError::InvalidDisplayName => write!(f, "Invalid display name"),
+            ApiError::FriendshipAlreadyRequested => write!(f, "Friendship was already requested"),
+            ApiError::AlreadyFriends => write!(f, "You are already friends"),
         }
     }
 }
@@ -260,6 +270,20 @@ impl actix_web::ResponseError for ApiError {
                 debug!("Invalid display name specified");
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
                     ApiStatusCode::InvalidDisplayName,
+                    self.to_string(),
+                ))
+            }
+            ApiError::FriendshipAlreadyRequested => {
+                debug!("Friendship was already requested");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::FriendshipAlreadyRequested,
+                    self.to_string(),
+                ))
+            }
+            ApiError::AlreadyFriends => {
+                debug!("Already friends");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::AlreadyFriends,
                     self.to_string(),
                 ))
             }
