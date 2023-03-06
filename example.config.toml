@@ -1,6 +1,8 @@
 [Server]
 ListenAddress = "127.0.0.1"
 ListenPort = 8080
+# You can generate a secret key by executing: runciv keygen
+SecretKey = ""
 
 [Database]
 Host = "127.0.0.1"

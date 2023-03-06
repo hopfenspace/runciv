@@ -13,6 +13,12 @@ pub struct ServerConfig {
     pub listen_address: IpAddr,
     /// The port the server should bind to
     pub listen_port: u16,
+    /// Base64 encoded secret key
+    ///
+    /// The key is used to sign and verify sessions.
+    ///
+    /// Do not expose this key!
+    pub secret_key: String,
 }
 
 /// Configuration regarding the database

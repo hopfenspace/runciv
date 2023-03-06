@@ -3,11 +3,17 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use actix_toolbox::tb_middleware::{setup_logging_mw, LoggingMiddlewareConfig};
+use actix_toolbox::tb_middleware::{
+    setup_logging_mw, DBSessionStore, LoggingMiddlewareConfig, PersistentSession, SessionMiddleware,
+};
+use actix_web::cookie::time::Duration;
+use actix_web::cookie::Key;
 use actix_web::http::StatusCode;
 use actix_web::middleware::{Compress, ErrorHandlers};
 use actix_web::web::{scope, Data, JsonConfig, PayloadConfig};
 use actix_web::{App, HttpServer};
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use log::info;
 use rorm::Database;
 use tokio::sync::Mutex;
@@ -44,8 +50,13 @@ pub async fn start_server(
     db: Database,
     ws_manager_chan: WsManagerChan,
 ) -> Result<(), StartServerError> {
-    let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
+    let key = Key::try_from(
+        BASE64_STANDARD
+            .decode(&config.server.secret_key)?
+            .as_slice(),
+    )?;
 
+    let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
     info!("Starting to listen on {}", s_addr);
 
     let file_data: FileData = Data::new(Mutex::new(HashMap::new()));
@@ -59,6 +70,14 @@ pub async fn start_server(
             .app_data(Data::new(ws_manager_chan.clone()))
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
             .wrap(Compress::default())
+            .wrap(
+                SessionMiddleware::builder(DBSessionStore::new(db.clone()), key.clone())
+                    .session_lifecycle(PersistentSession::session_ttl(
+                        PersistentSession::default(),
+                        Duration::hours(1),
+                    ))
+                    .build(),
+            )
             .wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_not_found))
             .service(SwaggerUi::new("/docs/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()))
             .service(register_account)

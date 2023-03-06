@@ -38,7 +38,9 @@ chrono = { version = ">=0.4.20", features = ["serde"] }
 # Bytes abstractions for network usage
 bytes = { version = "~1" }
 # UUID generation
-uuid = { version = "~1", features = ["v4"] }
+uuid = { version = "~1", features = ["v4", "serde"] }
+# Base64 encoding and decoding library
+base64 = { version = "~0.21" }
 
 # ORM
 rorm = { version = "~0.4", features = ["tokio-rustls"] }

@@ -11,6 +11,9 @@ use std::fs::read_to_string;
 use std::path::Path;
 
 use actix_toolbox::logging::setup_logging;
+use actix_web::cookie::Key;
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use clap::{Parser, Subcommand};
 use log::{error, info};
 use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
@@ -29,6 +32,8 @@ pub mod server;
 pub enum Command {
     /// Start the server
     Start,
+    /// Generate a secret key
+    Keygen,
 }
 
 /// The cli parser for runciv
@@ -64,6 +69,10 @@ async fn main() -> Result<(), String> {
                 error!("Error while starting server: {err}");
                 return Err(err.to_string());
             }
+        }
+        Command::Keygen => {
+            let key = Key::generate();
+            println!("{}", BASE64_STANDARD.encode(key.master()));
         }
     }
 
