@@ -1,13 +1,145 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
-use actix_web::{post, HttpResponse};
+use actix_web::{get, post, HttpResponse};
 use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, query, Database, Model};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::models::{Account, Friend, FriendInsert};
 use crate::server::handler::{ApiError, ApiResult};
+
+/// A single friend or friend request
+#[derive(Serialize, ToSchema)]
+pub struct FriendResponse {
+    #[schema(example = 1337)]
+    id: u64,
+    is_request: bool,
+    #[schema(example = "user321")]
+    from: String,
+    #[schema(example = "user123")]
+    to: String,
+}
+
+/// A list of your friends and friend requests
+#[derive(Serialize, ToSchema)]
+pub struct GetFriendResponse {
+    friends: Vec<FriendResponse>,
+}
+
+/// Retrieve your friend and friend requests.
+///
+/// If `is_request` is `true`, the entry is a request.
+///
+/// `from` specifies the origin of the request, `to` specifies the destination.
+///
+/// So if you have a request with `from` equal to your username, it means you have requested a
+/// friendship, but the destination hasn't accepted yet.
+///
+/// In the other case, if your username is in `to`, you have received a friend request.
+#[utoipa::path(
+    tag = "Friends",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns all friends and friend requests", body = GetFriendResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
+#[get("/friends")]
+pub async fn get_friends(
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<Json<GetFriendResponse>> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    let mut friends = vec![];
+
+    // Retrieve all friendships
+    friends.extend(
+        query!(
+            &db,
+            (
+                Friend::F.id,
+                Friend::F.from.fields().username,
+                Friend::F.to.fields().username
+            )
+        )
+        .transaction(&mut tx)
+        .condition(and!(
+            Friend::F.from.equals(&uuid),
+            Friend::F.is_request.equals(false)
+        ))
+        .all()
+        .await?
+        .into_iter()
+        .map(|(id, from, to)| FriendResponse {
+            id: id as u64,
+            is_request: false,
+            from,
+            to,
+        }),
+    );
+
+    // Retrieve all incoming requests
+    friends.extend(
+        query!(
+            &db,
+            (
+                Friend::F.id,
+                Friend::F.from.fields().username,
+                Friend::F.to.fields().username
+            )
+        )
+        .transaction(&mut tx)
+        .condition(and!(
+            Friend::F.to.equals(&uuid),
+            Friend::F.is_request.equals(true)
+        ))
+        .all()
+        .await?
+        .into_iter()
+        .map(|(id, from, to)| FriendResponse {
+            id: id as u64,
+            from,
+            to,
+            is_request: true,
+        }),
+    );
+
+    // Retrieve all outgoing requests
+    friends.extend(
+        query!(
+            &db,
+            (
+                Friend::F.id,
+                Friend::F.from.fields().username,
+                Friend::F.to.fields().username
+            )
+        )
+        .transaction(&mut tx)
+        .condition(and!(
+            Friend::F.from.equals(&uuid),
+            Friend::F.is_request.equals(true)
+        ))
+        .all()
+        .await?
+        .into_iter()
+        .map(|(id, from, to)| FriendResponse {
+            id: id as u64,
+            from,
+            to,
+            is_request: true,
+        }),
+    );
+
+    tx.commit().await?;
+
+    Ok(Json(GetFriendResponse { friends }))
+}
 
 /// The request of a new friendship
 #[derive(Deserialize, ToSchema)]
