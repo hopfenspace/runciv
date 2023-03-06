@@ -167,7 +167,7 @@ pub struct CreateFriendRequest {
     request_body = CreateFriendRequest,
     security(("api_key" = []))
 )]
-#[post("/friends/request")]
+#[post("/friends")]
 pub async fn create_friend_request(
     req: Json<CreateFriendRequest>,
     db: Data<Database>,
