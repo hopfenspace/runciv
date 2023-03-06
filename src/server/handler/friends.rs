@@ -1,10 +1,10 @@
 use actix_toolbox::tb_middleware::Session;
-use actix_web::web::{Data, Json};
-use actix_web::{get, post, HttpResponse};
+use actix_web::web::{Data, Json, Path};
+use actix_web::{delete, get, post, HttpResponse};
 use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, query, Database, Model};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::models::{Account, Friend, FriendInsert};
 use crate::server::handler::{ApiError, ApiResult};
@@ -208,4 +208,66 @@ pub async fn create_friend_request(
     tx.commit().await?;
 
     Ok(HttpResponse::Created().finish())
+}
+
+/// The id of a friend or friend request
+#[derive(Deserialize, IntoParams)]
+pub struct FriendId {
+    #[param(example = 1337)]
+    id: u64,
+}
+
+/// Don't want your friends anymore? Just delete them!
+#[utoipa::path(
+    tag = "Friends",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Friend has been deleted"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(FriendId),
+    security(("api_key" = []))
+)]
+#[delete("/friends/{id}")]
+pub async fn delete_friend(
+    path: Path<FriendId>,
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    // Check if friend exists
+    let f = query!(&db, Friend)
+        .transaction(&mut tx)
+        .condition(Friend::F.id.equals(path.id as i64))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidId)?;
+
+    let from = match &f.from {
+        ForeignModelByField::Key(k) => k.clone(),
+        _ => unreachable!("Not queried"),
+    };
+
+    let to = match &f.to {
+        ForeignModelByField::Key(k) => k.clone(),
+        _ => unreachable!("Not queried"),
+    };
+
+    // If executing user is neither from nor to, return permission denied
+    if from != uuid && to != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    rorm::delete!(&db, Friend)
+        .transaction(&mut tx)
+        .single(&f)
+        .await?;
+
+    tx.commit().await?;
+
+    Ok(HttpResponse::Ok().finish())
 }

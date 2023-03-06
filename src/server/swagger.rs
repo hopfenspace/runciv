@@ -33,6 +33,7 @@ impl Modify for SecurityAddon {
         handler::version,
         handler::create_friend_request,
         handler::get_friends,
+        handler::delete_friend,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,

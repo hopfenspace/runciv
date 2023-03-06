@@ -47,6 +47,8 @@ pub(crate) enum ApiStatusCode {
     InvalidDisplayName = 1010,
     FriendshipAlreadyRequested = 1011,
     AlreadyFriends = 1012,
+    InvalidId = 1013,
+    MissingPrivileges = 1014,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -104,6 +106,10 @@ pub enum ApiError {
     FriendshipAlreadyRequested,
     /// Users are already friends
     AlreadyFriends,
+    /// Invalid id specified
+    InvalidId,
+    /// Missing privileges to execute this operation
+    MissingPrivileges,
 
     /// Unknown error occurred
     InternalServerError,
@@ -143,6 +149,10 @@ impl Display for ApiError {
             ApiError::InvalidDisplayName => write!(f, "Invalid display name"),
             ApiError::FriendshipAlreadyRequested => write!(f, "Friendship was already requested"),
             ApiError::AlreadyFriends => write!(f, "You are already friends"),
+            ApiError::InvalidId => write!(f, "Invalid id specified"),
+            ApiError::MissingPrivileges => {
+                write!(f, "Missing privileges to execute this operation")
+            }
         }
     }
 }
@@ -284,6 +294,20 @@ impl actix_web::ResponseError for ApiError {
                 debug!("Already friends");
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
                     ApiStatusCode::AlreadyFriends,
+                    self.to_string(),
+                ))
+            }
+            ApiError::InvalidId => {
+                debug!("Invalid id specified");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::InvalidId,
+                    self.to_string(),
+                ))
+            }
+            ApiError::MissingPrivileges => {
+                debug!("Missing privileges");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::MissingPrivileges,
                     self.to_string(),
                 ))
             }
