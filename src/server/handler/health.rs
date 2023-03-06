@@ -1,17 +1,22 @@
 use actix_web::get;
 use actix_web::web::{Data, Json};
+use log::error;
 use rorm::{query, Database, Model};
 use serde::Serialize;
+use tokio::sync::oneshot;
 use utoipa::ToSchema;
 
+use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::Account;
-use crate::server::handler::ApiResult;
+use crate::server::handler::{ApiError, ApiResult};
 
 /// The health data of this server
 #[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
     #[schema(example = 1337)]
     accounts: u64,
+    #[schema(example = 31337)]
+    connections: u64,
 }
 
 /// Request health data from this server.
@@ -26,12 +31,41 @@ pub struct HealthResponse {
     security(("admin_token" = []))
 )]
 #[get("/health")]
-pub async fn health(db: Data<Database>) -> ApiResult<Json<HealthResponse>> {
+pub async fn health(
+    db: Data<Database>,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<Json<HealthResponse>> {
     let accounts = query!(&db, (Account::F.uuid.count(),))
         .one()
         .await?
         .0
         .unwrap() as u64;
 
-    Ok(Json(HealthResponse { accounts }))
+    let (tx, rx) = oneshot::channel();
+
+    let socket_count = tokio::spawn(async move { rx.await });
+
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::RetrieveWsCount(tx))
+        .await
+    {
+        error!("Could not send to ws manager chan: {err}");
+        return Err(ApiError::InternalServerError);
+    }
+
+    let connections = socket_count
+        .await
+        .map_err(|err| {
+            error!("Unable to join task: {err}");
+            ApiError::InternalServerError
+        })?
+        .map_err(|err| {
+            error!("Error receiving message from ws manager chan: {err}");
+            ApiError::InternalServerError
+        })?;
+
+    Ok(Json(HealthResponse {
+        accounts,
+        connections,
+    }))
 }
