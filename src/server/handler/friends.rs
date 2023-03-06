@@ -2,7 +2,7 @@ use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, HttpResponse};
 use rorm::internal::field::foreign_model::ForeignModelByField;
-use rorm::{and, insert, query, Database, Model};
+use rorm::{and, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -200,6 +200,7 @@ pub async fn create_friend_request(
     insert!(&db, FriendInsert)
         .transaction(&mut tx)
         .single(&FriendInsert {
+            is_request: true,
             from: ForeignModelByField::Key(uuid),
             to: ForeignModelByField::Key(target.uuid),
         })
@@ -265,6 +266,74 @@ pub async fn delete_friend(
     rorm::delete!(&db, Friend)
         .transaction(&mut tx)
         .single(&f)
+        .await?;
+
+    tx.commit().await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Accept a friend request
+#[utoipa::path(
+    tag = "Friends",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Friend request accepted"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(FriendId),
+    security(("api_key" = []))
+)]
+#[post("/friends/{id}")]
+pub async fn accept_friend_request(
+    path: Path<FriendId>,
+    session: Session,
+    db: Data<Database>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    // Check if friend request exists
+    let f = query!(&db, Friend)
+        .transaction(&mut tx)
+        .condition(and!(
+            Friend::F.id.equals(path.id as i64),
+            Friend::F.is_request.equals(true)
+        ))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidId)?;
+
+    let from = match &f.from {
+        ForeignModelByField::Key(k) => k.clone(),
+        _ => unreachable!("Not queried"),
+    };
+
+    let to = match &f.to {
+        ForeignModelByField::Key(k) => k.clone(),
+        _ => unreachable!("Not queried"),
+    };
+
+    // If executing user is neither from nor to, return permission denied
+    if from != uuid && to != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    update!(&db, Friend)
+        .transaction(&mut tx)
+        .set(Friend::F.is_request, false)
+        .exec()
+        .await?;
+
+    insert!(&db, FriendInsert)
+        .transaction(&mut tx)
+        .single(&FriendInsert {
+            is_request: false,
+            from: ForeignModelByField::Key(to),
+            to: ForeignModelByField::Key(from),
+        })
         .await?;
 
     tx.commit().await?;

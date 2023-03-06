@@ -32,6 +32,7 @@ impl Modify for SecurityAddon {
         handler::websocket,
         handler::version,
         handler::create_friend_request,
+        handler::accept_friend_request,
         handler::get_friends,
         handler::delete_friend,
     ),

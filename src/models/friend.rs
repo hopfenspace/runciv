@@ -26,6 +26,7 @@ pub struct Friend {
 #[derive(Patch)]
 #[rorm(model = "Friend")]
 pub(crate) struct FriendInsert {
+    pub is_request: bool,
     pub from: ForeignModel<Account>,
     pub to: ForeignModel<Account>,
 }
