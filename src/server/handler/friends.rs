@@ -2,7 +2,7 @@ use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
 use rorm::internal::field::foreign_model::ForeignModelByField;
-use rorm::{and, insert, query, update, Database, Model};
+use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -188,9 +188,15 @@ pub async fn create_friend_request(
     // Check if users are already in a friendship
     if let Some(friendship) = query!(&db, Friend)
         .transaction(&mut tx)
-        .condition(and!(
-            Friend::F.from.equals(&uuid),
-            Friend::F.to.equals(&target.uuid)
+        .condition(or!(
+            and!(
+                Friend::F.from.equals(&uuid),
+                Friend::F.to.equals(&target.uuid)
+            ),
+            and!(
+                Friend::F.from.equals(&target.uuid),
+                Friend::F.to.equals(&uuid)
+            )
         ))
         .optional()
         .await?
