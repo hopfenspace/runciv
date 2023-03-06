@@ -1,6 +1,6 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
-use actix_web::{delete, get, post, HttpResponse};
+use actix_web::{delete, get, post, put, HttpResponse};
 use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
@@ -291,7 +291,7 @@ pub async fn delete_friend(
     params(FriendId),
     security(("api_key" = []))
 )]
-#[post("/friends/{id}")]
+#[put("/friends/{id}")]
 pub async fn accept_friend_request(
     path: Path<FriendId>,
     session: Session,
