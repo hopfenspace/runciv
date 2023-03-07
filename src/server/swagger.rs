@@ -35,6 +35,7 @@ impl Modify for CookieSecurity {
         handler::accept_friend_request,
         handler::get_friends,
         handler::delete_friend,
+        handler::get_lobbies,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -48,6 +49,8 @@ impl Modify for CookieSecurity {
         handler::CreateFriendRequest,
         handler::GetFriendResponse,
         handler::FriendResponse,
+        handler::LobbyResponse,
+        handler::GetLobbiesResponse,
     )),
     modifiers(&CookieSecurity)
 )]

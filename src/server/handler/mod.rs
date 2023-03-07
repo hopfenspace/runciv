@@ -14,6 +14,7 @@ pub use crate::server::handler::accounts::*;
 pub use crate::server::handler::auth::*;
 pub use crate::server::handler::friends::*;
 pub use crate::server::handler::health::*;
+pub use crate::server::handler::lobbies::*;
 pub use crate::server::handler::version::*;
 pub use crate::server::handler::websocket::*;
 
@@ -21,6 +22,7 @@ mod accounts;
 mod auth;
 mod friends;
 mod health;
+mod lobbies;
 mod version;
 mod websocket;
 

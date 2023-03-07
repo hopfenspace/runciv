@@ -24,8 +24,9 @@ use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
-    accept_friend_request, create_friend_request, delete_friend, delete_me, get_friends, get_me,
-    health, login, logout, register_account, set_password, update_me, version, websocket,
+    accept_friend_request, create_friend_request, delete_friend, delete_me, get_friends,
+    get_lobbies, get_me, health, login, logout, register_account, set_password, update_me, version,
+    websocket,
 };
 use crate::server::middleware::{
     handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
@@ -116,7 +117,8 @@ pub async fn start_server(
                     .service(create_friend_request)
                     .service(accept_friend_request)
                     .service(get_friends)
-                    .service(delete_friend),
+                    .service(delete_friend)
+                    .service(get_lobbies),
             )
     })
     .bind(s_addr)?
