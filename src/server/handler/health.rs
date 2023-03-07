@@ -20,6 +20,9 @@ pub struct HealthResponse {
 }
 
 /// Request health data from this server.
+///
+/// `accounts` are the currently registered user accounts on the server
+/// `connections` are the currently open connections
 #[utoipa::path(
     tag = "Server status",
     context_path = "/api/v2/admin",
