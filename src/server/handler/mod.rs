@@ -53,6 +53,8 @@ pub(crate) enum ApiStatusCode {
     AlreadyFriends = 1012,
     InvalidId = 1013,
     MissingPrivileges = 1014,
+    InvalidMaxPlayersCount = 1017,
+    AlreadyInALobby = 1018,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -114,6 +116,10 @@ pub enum ApiError {
     InvalidId,
     /// Missing privileges to execute this operation
     MissingPrivileges,
+    /// Invalid max_players count
+    InvalidMaxPlayersCount,
+    /// The executing user is already in a lobby
+    AlreadyInALobby,
 
     /// Unknown error occurred
     InternalServerError,
@@ -157,6 +163,8 @@ impl Display for ApiError {
             ApiError::MissingPrivileges => {
                 write!(f, "Missing privileges to execute this operation")
             }
+            ApiError::InvalidMaxPlayersCount => write!(f, "Invalid max_players count"),
+            ApiError::AlreadyInALobby => write!(f, "Already in a lobby"),
         }
     }
 }
@@ -312,6 +320,20 @@ impl actix_web::ResponseError for ApiError {
                 debug!("Missing privileges");
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
                     ApiStatusCode::MissingPrivileges,
+                    self.to_string(),
+                ))
+            }
+            ApiError::InvalidMaxPlayersCount => {
+                debug!("Invalid max_players count found");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::InvalidMaxPlayersCount,
+                    self.to_string(),
+                ))
+            }
+            ApiError::AlreadyInALobby => {
+                debug!("Already in a lobby");
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::AlreadyInALobby,
                     self.to_string(),
                 ))
             }
