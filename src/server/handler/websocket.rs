@@ -77,9 +77,15 @@ pub async fn websocket(
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
             match res {
-                Ok(msg) => {
-                    debug!("msg: {msg:?}");
-                }
+                Ok(msg) => match msg {
+                    Message::Pong(_) => {
+                        let mut r = last_hb.lock().await;
+                        *r = Instant::now();
+                    }
+                    _ => {
+                        debug!("msg: {msg:?}");
+                    }
+                },
                 Err(err) => {
                     debug!("Protocol error: {err}");
                 }
