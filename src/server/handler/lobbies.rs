@@ -44,10 +44,9 @@ pub struct GetLobbiesResponse {
 pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesResponse>> {
     let mut lobbies = query!(&db, Lobby).all().await?;
 
-    Lobby::F
-        .current_player
-        .populate_bulk(&db, &mut lobbies)
-        .await?;
+    for lobby in &mut lobbies {
+        Lobby::F.current_player.populate(&db, lobby).await?;
+    }
 
     Ok(Json(GetLobbiesResponse {
         lobbies: lobbies
