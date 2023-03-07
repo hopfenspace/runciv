@@ -17,6 +17,7 @@ use base64::Engine;
 use clap::{Parser, Subcommand};
 use log::{error, info};
 use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
+use rorm_cli::migrate::MigrateOptions;
 
 use crate::chan::start_ws_manager;
 use crate::config::Config;
@@ -34,6 +35,15 @@ pub enum Command {
     Start,
     /// Generate a secret key
     Keygen,
+    /// Run database migrations
+    Migrate {
+        /// The directory where the migrations are located
+        #[clap(long)]
+        migration_dir: String,
+        /// The configuration for the database
+        #[clap(long)]
+        database_config: String,
+    },
 }
 
 /// The cli parser for runciv
@@ -73,6 +83,19 @@ async fn main() -> Result<(), String> {
         Command::Keygen => {
             let key = Key::generate();
             println!("{}", BASE64_STANDARD.encode(key.master()));
+        }
+        Command::Migrate {
+            migration_dir,
+            database_config,
+        } => {
+            rorm_cli::migrate::run_migrate(MigrateOptions {
+                apply_until: None,
+                log_queries: false,
+                migration_dir,
+                database_config,
+            })
+            .await
+            .map_err(|e| e.to_string())?;
         }
     }
 

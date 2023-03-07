@@ -46,6 +46,7 @@ base64 = { version = "~0.21" }
 
 # ORM
 rorm = { version = "~0.4", features = ["tokio-rustls"] }
+rorm-cli = { version = "~0.6" }
 
 # Async runtime
 tokio = { version = ">=1.23.1", features = ["rt-multi-thread", "sync", "macros"] }
