@@ -14,9 +14,9 @@ use crate::server::handler::{ApiError, ApiResult};
 #[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
     #[schema(example = 1337)]
-    accounts: u64,
+    registered_accounts: u64,
     #[schema(example = 31337)]
-    connections: u64,
+    open_connections: u64,
 }
 
 /// Request health data from this server.
@@ -70,7 +70,7 @@ pub async fn health(
         })?;
 
     Ok(Json(HealthResponse {
-        accounts,
-        connections,
+        registered_accounts: accounts,
+        open_connections: connections,
     }))
 }

@@ -39,10 +39,10 @@ pub struct GetFriendResponse {
 ///
 /// Regarding `friend_requests`:
 ///
-/// If you have a request with `from` equal to your username, it means you have requested a
+/// If you have a request with `from.uuid` equal to your username, it means you have requested a
 /// friendship, but the destination hasn't accepted yet.
 ///
-/// In the other case, if your username is in `to`, you have received a friend request.
+/// In the other case, if your username is in `to.uuid`, you have received a friend request.
 #[utoipa::path(
     tag = "Friends",
     context_path = "/api/v2",
