@@ -4,9 +4,11 @@ use actix_toolbox::ws;
 use actix_toolbox::ws::Message;
 use log::error;
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
+use uuid::Uuid;
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
     while let Some(msg) = rx.recv().await {
@@ -49,6 +51,41 @@ pub enum WsMessage {
     ServerQuitSocket,
     /// Response to the client if an invalid message was received
     InvalidMessage,
+    /// This variant is sent from the client that has finished its turn
+    FinishedTurn {
+        /// Identifier of the game
+        game_id: u64,
+        /// Data of the game
+        game_data: Box<RawValue>,
+    },
+    /// An update of the game data.
+    ///
+    /// This variant is sent from the server to all accounts that are in the game.
+    UpdateGameData {
+        /// Identifier of the game
+        game_id: u64,
+        /// Data of the game
+        game_data: Box<RawValue>,
+        /// A unique counter that is incremented every time a [FinishedTurn] is received from
+        /// the same `game_id`.
+        ///
+        /// This can be used by clients to check for updates on a long running game via API.
+        game_data_id: u64,
+    },
+    /// Notification for clients if a client in their game disconnected
+    ClientDisconnected {
+        /// Identifier of the game
+        game_id: u64,
+        /// The identifier of the client that disconnected
+        uuid: Uuid,
+    },
+    /// Notification for clients if a client in their game reconnected
+    ClientReconnected {
+        /// Identifier of the game
+        game_id: u64,
+        /// The identifier of the client that disconnected
+        uuid: Uuid,
+    },
 }
 
 /// This type is a sender to the websocket manager
