@@ -10,7 +10,7 @@ use rorm::{insert, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::models::{Lobby, LobbyAccount, LobbyAccountInsert, LobbyInsert};
+use crate::models::{Lobby, LobbyAccount, LobbyInsert};
 use crate::server::handler::{ApiError, ApiResult};
 
 /// A single lobby
@@ -58,7 +58,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
             .into_iter()
             .map(|l| LobbyResponse {
                 name: l.name,
-                current_players: l.current_player.cached.unwrap().len() as u8,
+                current_players: l.current_player.cached.unwrap().len() as u8 + 1,
                 max_players: l.max_player as u8,
                 password: l.password_hash.is_some(),
                 created_at: DateTime::from_utc(l.created_at, Utc),
@@ -130,6 +130,16 @@ pub async fn create_lobby(
         return Err(ApiError::AlreadyInALobby);
     }
 
+    if query!(&db, (Lobby::F.id,))
+        .transaction(&mut tx)
+        .condition(Lobby::F.owner.equals(&uuid))
+        .optional()
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::AlreadyInALobby);
+    }
+
     // Hash the password
     // Yes its only a game password, but why not ¯\_(ツ)_/¯
     let pw_hash = if let Some(pw) = &req.password {
@@ -154,15 +164,7 @@ pub async fn create_lobby(
             name: req.name.clone(),
             password_hash: pw_hash,
             max_player: req.max_players as i16,
-        })
-        .await?;
-
-    // Place the executing user in the lobby
-    insert!(&db, LobbyAccountInsert)
-        .transaction(&mut tx)
-        .single(&LobbyAccountInsert {
-            lobby: ForeignModelByField::Key(id),
-            player: ForeignModelByField::Key(uuid),
+            owner: ForeignModelByField::Key(uuid),
         })
         .await?;
 

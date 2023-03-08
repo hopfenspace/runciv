@@ -15,6 +15,10 @@ pub struct Lobby {
     #[rorm(max_length = 255)]
     pub name: String,
 
+    /// The owner of this lobby
+    #[rorm(on_delete = "Cascade", on_update = "Cascade")]
+    pub owner: ForeignModel<Account>,
+
     /// Optional password of the lobby
     #[rorm(max_length = 255)]
     pub password_hash: Option<String>,
@@ -35,6 +39,7 @@ pub struct Lobby {
 #[rorm(model = "Lobby")]
 pub(crate) struct LobbyInsert {
     pub(crate) name: String,
+    pub(crate) owner: ForeignModel<Account>,
     pub(crate) password_hash: Option<String>,
     pub(crate) max_player: i16,
 }
