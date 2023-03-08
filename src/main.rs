@@ -16,8 +16,8 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use clap::{Parser, Subcommand};
 use log::{error, info};
+use rorm::config::DatabaseConfig;
 use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
-use rorm_cli::migrate::MigrateOptions;
 
 use crate::chan::start_ws_manager;
 use crate::config::Config;
@@ -40,9 +40,6 @@ pub enum Command {
         /// The directory where the migrations are located
         #[clap(long)]
         migration_dir: String,
-        /// The configuration for the database
-        #[clap(long)]
-        database_config: String,
     },
 }
 
@@ -84,16 +81,23 @@ async fn main() -> Result<(), String> {
             let key = Key::generate();
             println!("{}", BASE64_STANDARD.encode(key.master()));
         }
-        Command::Migrate {
-            migration_dir,
-            database_config,
-        } => {
-            rorm_cli::migrate::run_migrate(MigrateOptions {
-                apply_until: None,
-                log_queries: false,
+        Command::Migrate { migration_dir } => {
+            let conf = get_conf(&cli.config_path)?;
+            rorm_cli::migrate::run_migrate_custom(
+                DatabaseConfig {
+                    last_migration_table_name: None,
+                    driver: DatabaseDriver::Postgres {
+                        host: conf.database.host,
+                        port: conf.database.port,
+                        name: conf.database.name,
+                        user: conf.database.user,
+                        password: conf.database.password,
+                    },
+                },
                 migration_dir,
-                database_config,
-            })
+                false,
+                None,
+            )
             .await
             .map_err(|e| e.to_string())?;
         }

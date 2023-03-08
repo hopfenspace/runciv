@@ -68,7 +68,7 @@ su - postgres -c "createdb -O runciv runciv"
 Apply the migrations:
 
 ```bash
-runciv migrate --migration-dir migrations/ --database-config /etc/runciv/config.toml
+runciv migrate --migration-dir migrations/
 ```
 
 Copy `example.config.toml` to `/etc/runciv/config.toml` and edit the file
