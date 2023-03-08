@@ -1,0 +1,25 @@
+[Migration]
+Hash = "5422948714640470120"
+Initial = false
+Dependency = 3
+Replaces = []
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobby"
+
+[Migration.Operations.Field]
+Name = "owner"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
