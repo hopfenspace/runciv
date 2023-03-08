@@ -30,7 +30,7 @@ pub struct GetFriendResponse {
     friend_requests: Vec<FriendResponse>,
 }
 
-/// Retrieve your friend and friend requests.
+/// Retrieve your friends and friend requests.
 ///
 /// `friends` is a list of already established friendships
 /// `friend_requests` is a list of friend requests (ingoing and outgoing)
