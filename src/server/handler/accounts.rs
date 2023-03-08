@@ -79,10 +79,11 @@ pub async fn register_account(
 /// The account data
 #[derive(Serialize, ToSchema)]
 pub struct AccountResponse {
+    pub(crate) uuid: Uuid,
     #[schema(example = "user123")]
-    username: String,
+    pub(crate) username: String,
     #[schema(example = "Herbert")]
-    display_name: String,
+    pub(crate) display_name: String,
 }
 
 /// Returns the account that is currently logged-in
@@ -107,6 +108,7 @@ pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<Acco
         .ok_or(ApiError::SessionCorrupt)?;
 
     Ok(Json(AccountResponse {
+        uuid: Uuid::from_slice(&account.uuid).map_err(|_| ApiError::InternalServerError)?,
         username: account.username,
         display_name: account.display_name,
     }))

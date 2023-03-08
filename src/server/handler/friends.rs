@@ -5,9 +5,10 @@ use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+use uuid::Uuid;
 
 use crate::models::{Account, Friend, FriendInsert};
-use crate::server::handler::{ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 
 /// A single friend or friend request
 #[derive(Serialize, ToSchema)]
@@ -15,9 +16,9 @@ pub struct FriendResponse {
     #[schema(example = 1337)]
     id: u64,
     #[schema(example = "user321")]
-    from: String,
+    from: AccountResponse,
     #[schema(example = "user123")]
-    to: String,
+    to: AccountResponse,
 }
 
 /// A list of your friends and friend requests
@@ -70,8 +71,12 @@ pub async fn get_friends(
             &db,
             (
                 Friend::F.id,
+                Friend::F.from.fields().uuid,
                 Friend::F.from.fields().username,
-                Friend::F.to.fields().username
+                Friend::F.from.fields().display_name,
+                Friend::F.to.fields().uuid,
+                Friend::F.to.fields().username,
+                Friend::F.to.fields().display_name,
             )
         )
         .transaction(&mut tx)
@@ -82,11 +87,29 @@ pub async fn get_friends(
         .all()
         .await?
         .into_iter()
-        .map(|(id, from, to)| FriendResponse {
-            id: id as u64,
-            from,
-            to,
-        }),
+        .map(
+            |(
+                id,
+                from_uuid,
+                from_username,
+                from_display_name,
+                to_uuid,
+                to_username,
+                to_display_name,
+            )| FriendResponse {
+                id: id as u64,
+                from: AccountResponse {
+                    uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                    username: from_username,
+                    display_name: from_display_name,
+                },
+                to: AccountResponse {
+                    uuid: Uuid::from_slice(&to_uuid).unwrap(),
+                    username: to_username,
+                    display_name: to_display_name,
+                },
+            },
+        ),
     );
 
     // Retrieve all incoming requests
@@ -95,8 +118,12 @@ pub async fn get_friends(
             &db,
             (
                 Friend::F.id,
+                Friend::F.from.fields().uuid,
                 Friend::F.from.fields().username,
-                Friend::F.to.fields().username
+                Friend::F.from.fields().display_name,
+                Friend::F.to.fields().uuid,
+                Friend::F.to.fields().username,
+                Friend::F.to.fields().display_name,
             )
         )
         .transaction(&mut tx)
@@ -107,11 +134,29 @@ pub async fn get_friends(
         .all()
         .await?
         .into_iter()
-        .map(|(id, from, to)| FriendResponse {
-            id: id as u64,
-            from,
-            to,
-        }),
+        .map(
+            |(
+                id,
+                from_uuid,
+                from_username,
+                from_display_name,
+                to_uuid,
+                to_username,
+                to_display_name,
+            )| FriendResponse {
+                id: id as u64,
+                from: AccountResponse {
+                    uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                    username: from_username,
+                    display_name: from_display_name,
+                },
+                to: AccountResponse {
+                    uuid: Uuid::from_slice(&to_uuid).unwrap(),
+                    username: to_username,
+                    display_name: to_display_name,
+                },
+            },
+        ),
     );
 
     // Retrieve all outgoing requests
@@ -120,8 +165,12 @@ pub async fn get_friends(
             &db,
             (
                 Friend::F.id,
+                Friend::F.from.fields().uuid,
                 Friend::F.from.fields().username,
-                Friend::F.to.fields().username
+                Friend::F.from.fields().display_name,
+                Friend::F.to.fields().uuid,
+                Friend::F.to.fields().username,
+                Friend::F.to.fields().display_name,
             )
         )
         .transaction(&mut tx)
@@ -132,11 +181,29 @@ pub async fn get_friends(
         .all()
         .await?
         .into_iter()
-        .map(|(id, from, to)| FriendResponse {
-            id: id as u64,
-            from,
-            to,
-        }),
+        .map(
+            |(
+                id,
+                from_uuid,
+                from_username,
+                from_display_name,
+                to_uuid,
+                to_username,
+                to_display_name,
+            )| FriendResponse {
+                id: id as u64,
+                from: AccountResponse {
+                    uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                    username: from_username,
+                    display_name: from_display_name,
+                },
+                to: AccountResponse {
+                    uuid: Uuid::from_slice(&to_uuid).unwrap(),
+                    username: to_username,
+                    display_name: to_display_name,
+                },
+            },
+        ),
     );
 
     tx.commit().await?;
@@ -150,9 +217,8 @@ pub async fn get_friends(
 /// The request of a new friendship
 #[derive(Deserialize, ToSchema)]
 pub struct CreateFriendRequest {
-    /// The username of the new friend
-    #[schema(example = "user321")]
-    username: String,
+    /// The uuid of the new friend
+    uuid: Uuid,
 }
 
 /// Create a new friend request
@@ -160,7 +226,7 @@ pub struct CreateFriendRequest {
     tag = "Friends",
     context_path = "/api/v2",
     responses(
-        (status = 202, description = "Friend request has been created"),
+        (status = 200, description = "Friend request has been created"),
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
@@ -180,7 +246,7 @@ pub async fn create_friend_request(
     // Check if target exists
     let target = query!(&db, Account)
         .transaction(&mut tx)
-        .condition(Account::F.username.equals(&req.username))
+        .condition(Account::F.uuid.equals(req.uuid.as_bytes().as_slice()))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUsername)?;
@@ -220,7 +286,7 @@ pub async fn create_friend_request(
 
     tx.commit().await?;
 
-    Ok(HttpResponse::Created().finish())
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// The id of a friend or friend request
