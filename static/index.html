@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RUnciv</title>
+    <style>
+        body {
+            background-color: #11121c;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .content {
+            scale: 3;
+            position: absolute;
+            left: 30vw;
+        }
+
+        .hex-brick{
+            background: #2b60d9;
+            width: 30px;
+            height: 17px;
+            position: absolute;
+            top: 5px;
+        }
+
+        .h2{
+            transform: rotate(60deg);
+        }
+
+        .h3{
+            transform: rotate(-60deg);
+        }
+
+        .gel{
+            height: 30px;
+            width: 30px;
+            transition: all .3s;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+        }
+
+        .center-gel{
+            margin-left: -15px;
+            margin-top: -15px;
+
+            animation-name: pulse;
+            animation-duration: 2s;
+            animation-iteration-count: infinite;
+        }
+
+        .c1{
+            margin-left: -47px;
+            margin-top: -15px;
+        }
+
+        .c2{
+            margin-left: -31px;
+            margin-top: -43px;
+        }
+
+        .c3{
+            margin-left: 1px;
+            margin-top: -43px;
+        }
+
+        .c4{
+            margin-left: 17px;
+            margin-top: -15px;
+        }
+        .c5{
+            margin-left: -31px;
+            margin-top: 13px;
+        }
+
+        .c6{
+            margin-left: 1px;
+            margin-top: 13px;
+        }
+
+        .r1 {
+            animation-name: pulse;
+            animation-duration: 2s;
+            animation-iteration-count: infinite;
+            animation-delay: 1s;
+        }
+
+        .heading1 {
+            font-family: "Roboto", sans-serif;
+            font-weight: lighter;
+            color: #eee;
+            text-align: center;
+            margin-top: 1.5rem;
+            margin-bottom: 0;
+        }
+
+        .heading2 {
+            font-family: "Roboto", sans-serif;
+            font-weight: lighter;
+            color: #eee;
+            text-align: center;
+        }
+
+        a {
+            text-decoration: underline;
+            color: #eee;
+            transition: all ease 200ms;
+        }
+
+        a:hover {
+            color: #0cf;
+        }
+
+        .right {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 50vw;
+            height: 100vh;
+            width: 50vw;
+        }
+
+        @keyframes pulse{
+            0%{
+                transform: scale(1);
+            }
+
+            50%{
+                transform: scale(0.2);
+            }
+
+            100%{
+                transform: scale(1);
+            }
+        }
+
+    </style>
+</head>
+<body>
+<div class="content">
+    <div class="gel center-gel">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c1 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c2 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c3 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c4 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c5 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+    <div class="gel c6 r1">
+        <div class="hex-brick h1"></div>
+        <div class="hex-brick h2"></div>
+        <div class="hex-brick h3"></div>
+    </div>
+</div>
+<div class="right">
+    <h1 class="heading1">
+        This server is running <a href="https://github.com/hopfenspace/runciv">runciv</a>!
+    </h1>
+    <h2 class="heading2">
+        <a href="/docs/">API</a> reference
+    </h2>
+</div>
+</body>
+</html>

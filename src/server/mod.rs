@@ -23,11 +23,7 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
-use crate::server::handler::{
-    accept_friend_request, create_friend_request, create_lobby, delete_friend, delete_me,
-    get_friends, get_lobbies, get_me, health, login, logout, register_account, set_password,
-    update_me, version, websocket,
-};
+use crate::server::handler::{accept_friend_request, create_friend_request, create_lobby, delete_friend, delete_me, get_friends, get_lobbies, get_me, health, login, logout, register_account, set_password, update_me, version, websocket, welcome_page};
 use crate::server::middleware::{
     handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
 };
@@ -88,6 +84,7 @@ pub async fn start_server(
                     .build(),
             )
             .wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_not_found))
+            .service(welcome_page)
             .service(SwaggerUi::new("/docs/{_:.*}").urls(vec![
                 (
                     Url::new("user-api", "/api-doc/userapi.json"),

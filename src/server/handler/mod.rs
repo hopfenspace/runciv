@@ -17,6 +17,7 @@ pub use crate::server::handler::health::*;
 pub use crate::server::handler::lobbies::*;
 pub use crate::server::handler::version::*;
 pub use crate::server::handler::websocket::*;
+pub use crate::server::handler::welcome_page::*;
 
 mod accounts;
 mod auth;
@@ -25,6 +26,7 @@ mod health;
 mod lobbies;
 mod version;
 mod websocket;
+mod welcome_page;
 
 /// The result that is used throughout the complete api.
 pub type ApiResult<T> = Result<T, ApiError>;
