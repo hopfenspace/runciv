@@ -6,12 +6,13 @@ use argon2::{Argon2, PasswordHasher};
 use chrono::{DateTime, Utc};
 use rand::thread_rng;
 use rorm::internal::field::foreign_model::ForeignModelByField;
-use rorm::{insert, query, Database, Model};
+use rorm::{insert, query, BackRef, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
-use crate::models::{Lobby, LobbyAccount, LobbyInsert};
-use crate::server::handler::{ApiError, ApiResult};
+use crate::models::{Account, Lobby, LobbyAccount, LobbyInsert};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 
 /// A single lobby
 #[derive(Serialize, ToSchema)]
@@ -24,6 +25,7 @@ pub struct LobbyResponse {
     current_players: u8,
     created_at: DateTime<Utc>,
     password: bool,
+    owner: AccountResponse,
 }
 
 /// The lobbies that are open
@@ -47,7 +49,51 @@ pub struct GetLobbiesResponse {
 )]
 #[get("/lobbies")]
 pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesResponse>> {
-    let mut lobbies = query!(&db, Lobby).all().await?;
+    let lobbies = query!(
+        &db,
+        (
+            Lobby::F.id,
+            Lobby::F.owner.f().uuid,
+            Lobby::F.owner.f().username,
+            Lobby::F.owner.f().display_name,
+            Lobby::F.name,
+            Lobby::F.created_at,
+            Lobby::F.max_player,
+            Lobby::F.password_hash,
+        )
+    )
+    .all()
+    .await?;
+
+    let mut lobbies: Vec<Lobby> = lobbies
+        .into_iter()
+        .map(
+            |(
+                id,
+                o_uuid,
+                o_username,
+                o_display_name,
+                name,
+                created_at,
+                max_player,
+                password_hash,
+            )| Lobby {
+                id,
+                name,
+                current_player: BackRef { cached: None },
+                owner: ForeignModelByField::Instance(Box::new(Account {
+                    uuid: o_uuid,
+                    username: o_username,
+                    display_name: o_display_name,
+                    last_login: None,
+                    password_hash: String::new(),
+                })),
+                created_at,
+                max_player,
+                password_hash,
+            },
+        )
+        .collect();
 
     for lobby in &mut lobbies {
         Lobby::F.current_player.populate(&db, lobby).await?;
@@ -56,12 +102,22 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
     Ok(Json(GetLobbiesResponse {
         lobbies: lobbies
             .into_iter()
-            .map(|l| LobbyResponse {
-                name: l.name,
-                current_players: l.current_player.cached.unwrap().len() as u8 + 1,
-                max_players: l.max_player as u8,
-                password: l.password_hash.is_some(),
-                created_at: DateTime::from_utc(l.created_at, Utc),
+            .map(|l| {
+                let Some(owner) = l.owner.instance() else {
+                    unreachable!("Owner should be queried!")
+                };
+                LobbyResponse {
+                    name: l.name,
+                    owner: AccountResponse {
+                        uuid: Uuid::from_slice(&owner.uuid).unwrap(),
+                        username: owner.username.clone(),
+                        display_name: owner.display_name.clone(),
+                    },
+                    current_players: l.current_player.cached.unwrap().len() as u8 + 1,
+                    max_players: l.max_player as u8,
+                    password: l.password_hash.is_some(),
+                    created_at: DateTime::from_utc(l.created_at, Utc),
+                }
             })
             .collect(),
     }))
