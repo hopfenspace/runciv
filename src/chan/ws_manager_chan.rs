@@ -98,7 +98,7 @@ pub enum WsManagerMessage {
     /// Client with given uuid initialized a websocket
     OpenedSocket(Vec<u8>, ws::Sender),
     /// Send a message to given uuid
-    Message(Vec<u8>, WsMessage),
+    SendMessage(Vec<u8>, WsMessage),
     /// Retrieve the current websocket count by sending this
     /// message to the ws manager.
     ///
@@ -149,7 +149,7 @@ pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
                         lookup.insert(uuid, vec![tx]);
                     }
                 }
-                WsManagerMessage::Message(uuid, msg) => {
+                WsManagerMessage::SendMessage(uuid, msg) => {
                     if let Some(sender) = lookup.get(&uuid) {
                         for tx in sender {
                             if let Err(err) = tx.send(msg.clone()).await {
