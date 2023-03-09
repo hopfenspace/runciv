@@ -339,3 +339,51 @@ pub async fn lookup_account_by_uuid(
         display_name: account.display_name,
     }))
 }
+
+/// The request to lookup an account by its username
+#[derive(Deserialize, ToSchema)]
+pub struct LookupAccountUsernameRequest {
+    username: String,
+}
+
+/// Retrieve details for an account by its username
+///
+/// **Important note**:
+///
+/// Usernames can be changed, so don't assume you can cache them to do lookups for their
+/// display names or uuids when necessary. They solely exist to provide a good user experience
+/// when searching for friends, etc..
+///
+/// If you receive a username by a user, you should convert them with this endpoint to an uuid.
+/// Those are used in the database to uniquely identify a user and can't be changed, just deleted.
+#[utoipa::path(
+    tag = "Accounts", 
+    context_path = "/api/v2",    
+    responses(
+        (status = 200, description = "Returns the requested account data", body = AccountResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    request_body = LookupAccountUsernameRequest,
+    security(("session_cookie" = []))
+)]
+#[post("/accounts/lookupUsername")]
+pub async fn lookup_account_by_username(
+    req: Json<LookupAccountUsernameRequest>,
+    db: Data<Database>,
+) -> ApiResult<Json<AccountResponse>> {
+    let account = query!(&db, Account)
+        .condition(Account::F.username.equals(&req.username))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUsername)?;
+
+    Ok(Json(AccountResponse {
+        uuid: Uuid::from_slice(&account.uuid).map_err(|err| {
+            error!("Retrieved invalid uuid from db: {err}");
+            ApiError::InternalServerError
+        })?,
+        username: account.username,
+        display_name: account.display_name,
+    }))
+}
