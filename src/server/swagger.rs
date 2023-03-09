@@ -37,6 +37,7 @@ impl Modify for CookieSecurity {
         handler::delete_friend,
         handler::get_lobbies,
         handler::create_lobby,
+        handler::lookup_account_by_uuid,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,

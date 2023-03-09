@@ -6,9 +6,10 @@ use actix_toolbox::tb_middleware::actix_session;
 use actix_web::body::BoxBody;
 use actix_web::HttpResponse;
 use log::{debug, error, info, trace, warn};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_repr::Serialize_repr;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
+use uuid::Uuid;
 
 pub use crate::server::handler::accounts::*;
 pub use crate::server::handler::auth::*;
@@ -57,10 +58,17 @@ pub(crate) enum ApiStatusCode {
     MissingPrivileges = 1014,
     InvalidMaxPlayersCount = 1017,
     AlreadyInALobby = 1018,
+    InvalidUuid = 1019,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
     SessionError = 2002,
+}
+
+/// Parameter for accessing resources by path via uuid
+#[derive(Deserialize, IntoParams)]
+pub struct PathUuid {
+    pub(crate) uuid: Uuid,
 }
 
 /// The Response that is returned in case of an error
@@ -122,6 +130,8 @@ pub enum ApiError {
     InvalidMaxPlayersCount,
     /// The executing user is already in a lobby
     AlreadyInALobby,
+    /// The provided uuid was not valid
+    InvalidUuid,
 
     /// Unknown error occurred
     InternalServerError,
@@ -167,6 +177,7 @@ impl Display for ApiError {
             }
             ApiError::InvalidMaxPlayersCount => write!(f, "Invalid max_players count"),
             ApiError::AlreadyInALobby => write!(f, "Already in a lobby"),
+            ApiError::InvalidUuid => write!(f, "The provided uuid was not valid"),
         }
     }
 }
@@ -339,6 +350,10 @@ impl actix_web::ResponseError for ApiError {
                     self.to_string(),
                 ))
             }
+            ApiError::InvalidUuid => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::InvalidUuid,
+                self.to_string(),
+            )),
         }
     }
 }

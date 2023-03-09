@@ -1,7 +1,7 @@
 //! All handlers for the account endpoints live in here
 
 use actix_toolbox::tb_middleware::Session;
-use actix_web::web::{Data, Json};
+use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
 use argon2::password_hash::{Error, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::{Account, AccountInsert};
-use crate::server::handler::{ApiError, ApiResult};
+use crate::server::handler::{ApiError, ApiResult, PathUuid};
 
 /// The content to register a new account
 #[derive(Debug, Deserialize, ToSchema)]
@@ -304,4 +304,38 @@ pub async fn update_me(
     tx.commit().await?;
 
     Ok(HttpResponse::Ok().finish())
+}
+
+/// Retrieve details for an account by uuid
+///
+/// As usernames are changeable, accounts are identified by uuids, which are used throughout
+/// the API.
+///
+/// To fetch `display_name` and `username` for a given `uuid`, this endpoint shall be used.
+#[utoipa::path(
+    tag = "Accounts",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns the requested account data", body = AccountResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = [])))]
+#[get("/accounts/{uuid}")]
+pub async fn lookup_account_by_uuid(
+    req: Path<PathUuid>,
+    db: Data<Database>,
+) -> ApiResult<Json<AccountResponse>> {
+    let account = query!(&db, Account)
+        .condition(Account::F.uuid.equals(&req.uuid))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUuid)?;
+
+    Ok(Json(AccountResponse {
+        uuid: req.uuid,
+        username: account.username,
+        display_name: account.display_name,
+    }))
 }
