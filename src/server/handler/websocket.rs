@@ -10,6 +10,7 @@ use bytes::Bytes;
 use log::{debug, error};
 use tokio::sync::Mutex;
 
+use crate::chan::WsManagerMessage::Message;
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::server::handler::ApiError;
 
@@ -74,6 +75,7 @@ pub async fn websocket(
         }
     });
 
+    let rx_tx = tx.clone();
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
             match res {
@@ -81,6 +83,15 @@ pub async fn websocket(
                     Message::Pong(_) => {
                         let mut r = last_hb.lock().await;
                         *r = Instant::now();
+                    }
+                    Message::Ping(req) => {
+                        if let Err(err) = rx_tx.send(Message::Pong(req)).await {
+                            error!("Could not send to tx: {err}");
+                            if let MailboxError::Closed = err {
+                                debug!("Websocket closed");
+                                break;
+                            }
+                        }
                     }
                     _ => {
                         debug!("msg: {msg:?}");
