@@ -62,6 +62,7 @@ impl Modify for CookieSecurity {
         handler::LookupAccountUsernameRequest,
         handler::GetChatResponse,
         handler::ChatMessage,
+        handler::ChatMember,
     )),
     modifiers(&CookieSecurity)
 )]
