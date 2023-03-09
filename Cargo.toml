@@ -56,6 +56,9 @@ tokio = { version = ">=1.23.1", features = ["rt-multi-thread", "sync", "macros"]
 futures = { version = "~0.3" }
 futures-util = "0.3"
 
+# More iterators
+itertools = { version = "~0.10" }
+
 # Lazy initialization
 once_cell = { version = "~1" }
 

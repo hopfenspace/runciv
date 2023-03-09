@@ -85,7 +85,7 @@ pub async fn register_account(
 }
 
 /// The account data
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Eq, Ord, PartialOrd, PartialEq)]
 pub struct AccountResponse {
     pub(crate) uuid: Uuid,
     #[schema(example = "user123")]

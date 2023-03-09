@@ -20,7 +20,7 @@ pub struct ChatRoom {
 
 #[derive(Patch)]
 #[rorm(model = "ChatRoom")]
-pub(crate) struct ChatRoomInsert {}
+pub(crate) struct ChatRoomInsert;
 
 /// The member <-> chatroom relation
 #[derive(Model, Debug)]
@@ -57,6 +57,10 @@ pub struct ChatRoomMessage {
     #[rorm(id)]
     pub id: i64,
 
+    /// The account that send the message
+    #[rorm(on_delete = "Cascade", on_update = "Cascade")]
+    pub sender: ForeignModel<Account>,
+
     /// The relation to the chat room
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
     pub chat_room: ForeignModel<ChatRoom>,
@@ -73,6 +77,7 @@ pub struct ChatRoomMessage {
 #[derive(Patch)]
 #[rorm(model = "ChatRoomMessage")]
 pub(crate) struct ChatRoomMessageInsert {
-    pub chat_room: ForeignModel<ChatRoom>,
-    pub message: String,
+    pub(crate) chat_room: ForeignModel<ChatRoom>,
+    pub(crate) sender: ForeignModel<Account>,
+    pub(crate) message: String,
 }

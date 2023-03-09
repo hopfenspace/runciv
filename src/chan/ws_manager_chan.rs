@@ -43,7 +43,7 @@ pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMes
 ///
 /// The messages will get serialized and deserialized using JSON
 #[derive(Deserialize, Serialize, Clone)]
-#[serde(tag = "type", content = "content", rename_all = "snake_case")]
+#[serde(tag = "type", content = "content", rename_all = "camelCase")]
 pub enum WsMessage {
     /// This variant is only used internally to signal a socket handler that it should
     /// shutdown

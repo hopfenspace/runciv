@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 pub use crate::server::handler::accounts::*;
 pub use crate::server::handler::auth::*;
+pub use crate::server::handler::chats::*;
 pub use crate::server::handler::friends::*;
 pub use crate::server::handler::health::*;
 pub use crate::server::handler::lobbies::*;
@@ -22,6 +23,7 @@ pub use crate::server::handler::welcome_page::*;
 
 mod accounts;
 mod auth;
+mod chats;
 mod friends;
 mod health;
 mod lobbies;
