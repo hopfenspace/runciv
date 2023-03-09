@@ -16,7 +16,7 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 /// The message of a chatroom
 ///
 /// The parameter `id` should be used to uniquely identify a message
-#[derive(Serialize, ToSchema, Eq)]
+#[derive(Serialize, ToSchema, Eq, Deserialize, Clone, Debug)]
 pub struct ChatMessage {
     #[schema(example = 1337)]
     id: i64,

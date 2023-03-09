@@ -10,6 +10,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use uuid::Uuid;
 
+use crate::server::handler::ChatMessage;
+
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
     while let Some(msg) = rx.recv().await {
         match msg {
@@ -88,6 +90,13 @@ pub enum WsMessage {
         game_id: u64,
         /// The identifier of the client that disconnected
         uuid: Uuid,
+    },
+    /// A new chat message is sent to the client.
+    IncomingChatMessage {
+        /// Identifier of the chat, the message originated from
+        chat_id: u64,
+        /// The new message
+        message: ChatMessage,
     },
 }
 
