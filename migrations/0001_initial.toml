@@ -1,86 +1,424 @@
 [Migration]
-Hash = '3801360102409301020'
+Hash = "11536617260236760423"
 Initial = true
 Replaces = []
 
 [[Migration.Operations]]
-Type = 'CreateModel'
-Name = 'account'
+Type = "CreateModel"
+Name = "chatroom"
 
 [[Migration.Operations.Fields]]
-Name = 'uuid'
-Type = 'varbinary'
+Name = "id"
+Type = "int64"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'primary_key'
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "chatroommember"
 
 [[Migration.Operations.Fields]]
-Name = 'username'
-Type = 'varchar'
+Name = "id"
+Type = "int64"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'max_length'
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations.Fields]]
+Name = "created_at"
+Type = "datetime"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_create_time"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "chatroommessage"
+
+[[Migration.Operations.Fields]]
+Name = "id"
+Type = "int64"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations.Fields]]
+Name = "message"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
+Value = 2048
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Fields]]
+Name = "created_at"
+Type = "datetime"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_create_time"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "lobby"
+
+[[Migration.Operations.Fields]]
+Name = "id"
+Type = "int64"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations.Fields]]
+Name = "name"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
 Value = 255
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'unique'
-
-[[Migration.Operations.Fields.Annotations]]
-Type = 'not_null'
+Type = "not_null"
 
 [[Migration.Operations.Fields]]
-Name = 'display_name'
-Type = 'varchar'
+Name = "password_hash"
+Type = "varchar"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'max_length'
+Type = "max_length"
+Value = 255
+
+[[Migration.Operations.Fields]]
+Name = "max_player"
+Type = "int16"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Fields]]
+Name = "created_at"
+Type = "datetime"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_create_time"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "lobbyaccount"
+
+[[Migration.Operations.Fields]]
+Name = "id"
+Type = "int64"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "account"
+
+[[Migration.Operations.Fields]]
+Name = "uuid"
+Type = "varbinary"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations.Fields]]
+Name = "username"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
 Value = 255
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'not_null'
-
-[[Migration.Operations.Fields]]
-Name = 'password_hash'
-Type = 'varchar'
+Type = "unique"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'max_length'
+Type = "not_null"
+
+[[Migration.Operations.Fields]]
+Name = "display_name"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
+Value = 255
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Fields]]
+Name = "password_hash"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
 Value = 1024
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'not_null'
+Type = "not_null"
 
 [[Migration.Operations.Fields]]
-Name = 'last_login'
-Type = 'datetime'
+Name = "last_login"
+Type = "datetime"
 Annotations = []
 
 [[Migration.Operations]]
-Type = 'CreateModel'
-Name = 'dbsession'
+Type = "CreateModel"
+Name = "friend"
 
 [[Migration.Operations.Fields]]
-Name = 'session_key'
-Type = 'varchar'
+Name = "id"
+Type = "int64"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'max_length'
+Type = "auto_increment"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "primary_key"
+
+[[Migration.Operations.Fields]]
+Name = "is_request"
+Type = "boolean"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateModel"
+Name = "dbsession"
+
+[[Migration.Operations.Fields]]
+Name = "session_key"
+Type = "varchar"
+
+[[Migration.Operations.Fields.Annotations]]
+Type = "max_length"
 Value = 4096
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'primary_key'
+Type = "primary_key"
 
 [[Migration.Operations.Fields]]
-Name = 'session_state'
-Type = 'varchar'
+Name = "session_state"
+Type = "varchar"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'max_length'
+Type = "max_length"
 Value = 1048576
 
 [[Migration.Operations.Fields]]
-Name = 'expired_after'
-Type = 'datetime'
+Name = "expired_after"
+Type = "datetime"
 
 [[Migration.Operations.Fields.Annotations]]
-Type = 'not_null'
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "chatroommessage"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "int64"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "id"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "from"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "to"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "int64"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "id"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobby"
+
+[Migration.Operations.Field]
+Name = "owner"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobbyaccount"
+
+[Migration.Operations.Field]
+Name = "lobby"
+Type = "int64"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "lobby"
+ColumnName = "id"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobbyaccount"
+
+[Migration.Operations.Field]
+Name = "player"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "chatroommember"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "int64"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "id"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "chatroommember"
+
+[Migration.Operations.Field]
+Name = "member"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
