@@ -44,6 +44,14 @@ pub async fn register_account(
 ) -> ApiResult<HttpResponse> {
     let mut tx = db.start_transaction().await?;
 
+    if req.username.is_empty() {
+        return Err(ApiError::InvalidUsername);
+    }
+
+    if req.display_name.is_empty() {
+        return Err(ApiError::InvalidDisplayName);
+    }
+
     if query!(&db, (Account::F.uuid,))
         .transaction(&mut tx)
         .condition(Account::F.username.equals(&req.username))
