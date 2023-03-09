@@ -10,9 +10,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
-use crate::models::{
-    Account, ChatRoom, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert,
-};
+use crate::models::{Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, OnlineAccountResponse};
 
 /// A single friend
