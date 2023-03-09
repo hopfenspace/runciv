@@ -54,6 +54,8 @@ impl Modify for CookieSecurity {
         handler::GetLobbiesResponse,
         handler::CreateLobbyResponse,
         handler::CreateLobbyRequest,
+        handler::OnlineAccountResponse,
+        handler::FriendRequestResponse,
     )),
     modifiers(&CookieSecurity)
 )]

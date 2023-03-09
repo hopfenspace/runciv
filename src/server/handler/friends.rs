@@ -1,23 +1,33 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
+use log::error;
 use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
+use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::{Account, Friend, FriendInsert};
-use crate::server::handler::{AccountResponse, ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult, OnlineAccountResponse};
 
-/// A single friend or friend request
+/// A single friend
 #[derive(Serialize, ToSchema)]
 pub struct FriendResponse {
     #[schema(example = 1337)]
     id: u64,
-    #[schema(example = "user321")]
     from: AccountResponse,
-    #[schema(example = "user123")]
+    to: OnlineAccountResponse,
+}
+
+/// A single friend request
+#[derive(Serialize, ToSchema)]
+pub struct FriendRequestResponse {
+    #[schema(example = 1337)]
+    id: u64,
+    from: AccountResponse,
     to: AccountResponse,
 }
 
@@ -28,7 +38,7 @@ pub struct FriendResponse {
 #[derive(Serialize, ToSchema)]
 pub struct GetFriendResponse {
     friends: Vec<FriendResponse>,
-    friend_requests: Vec<FriendResponse>,
+    friend_requests: Vec<FriendRequestResponse>,
 }
 
 /// Retrieve your friends and friend requests.
@@ -57,38 +67,65 @@ pub struct GetFriendResponse {
 pub async fn get_friends(
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<Json<GetFriendResponse>> {
     let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
-    let mut friends = vec![];
     let mut friend_requests = vec![];
 
-    // Retrieve all friendships
-    friends.extend(
-        query!(
-            &db,
-            (
-                Friend::F.id,
-                Friend::F.from.fields().uuid,
-                Friend::F.from.fields().username,
-                Friend::F.from.fields().display_name,
-                Friend::F.to.fields().uuid,
-                Friend::F.to.fields().username,
-                Friend::F.to.fields().display_name,
-            )
+    let friends_raw = query!(
+        &db,
+        (
+            Friend::F.id,
+            Friend::F.from.fields().uuid,
+            Friend::F.from.fields().username,
+            Friend::F.from.fields().display_name,
+            Friend::F.to.fields().uuid,
+            Friend::F.to.fields().username,
+            Friend::F.to.fields().display_name,
         )
-        .transaction(&mut tx)
-        .condition(and!(
-            Friend::F.from.equals(&uuid),
-            Friend::F.is_request.equals(false)
+    )
+    .transaction(&mut tx)
+    .condition(and!(
+        Friend::F.from.equals(&uuid),
+        Friend::F.is_request.equals(false)
+    ))
+    .all()
+    .await?;
+
+    let (oneshot_tx, oneshot_rx) = oneshot::channel();
+    let online_state = tokio::spawn(async move { oneshot_rx.await });
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::RetrieveOnlineState(
+            friends_raw.iter().map(|raw| raw.4.clone()).collect(),
+            oneshot_tx,
         ))
-        .all()
-        .await?
-        .into_iter()
-        .map(
-            |(
+        .await
+    {
+        error!("Could not send to ws manager chan: {err}");
+        return Err(ApiError::InternalServerError);
+    }
+
+    let online_state = match online_state.await {
+        Ok(res) => match res {
+            Ok(state) => state,
+            Err(err) => {
+                error!("Error receiving online state from ws manager chan: {err}");
+                return Err(ApiError::InternalServerError);
+            }
+        },
+        Err(err) => {
+            error!("Error joining task: {err}");
+            return Err(ApiError::InternalServerError);
+        }
+    };
+
+    // Retrieve all friendships
+    let friends = Vec::from_iter(friends_raw.into_iter().zip(online_state).map(
+        |(
+            (
                 id,
                 from_uuid,
                 from_username,
@@ -96,21 +133,23 @@ pub async fn get_friends(
                 to_uuid,
                 to_username,
                 to_display_name,
-            )| FriendResponse {
-                id: id as u64,
-                from: AccountResponse {
-                    uuid: Uuid::from_slice(&from_uuid).unwrap(),
-                    username: from_username,
-                    display_name: from_display_name,
-                },
-                to: AccountResponse {
-                    uuid: Uuid::from_slice(&to_uuid).unwrap(),
-                    username: to_username,
-                    display_name: to_display_name,
-                },
+            ),
+            online,
+        )| FriendResponse {
+            id: id as u64,
+            from: AccountResponse {
+                uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                username: from_username,
+                display_name: from_display_name,
             },
-        ),
-    );
+            to: OnlineAccountResponse {
+                uuid: Uuid::from_slice(&to_uuid).unwrap(),
+                username: to_username,
+                display_name: to_display_name,
+                online,
+            },
+        },
+    ));
 
     // Retrieve all incoming requests
     friend_requests.extend(
@@ -143,7 +182,7 @@ pub async fn get_friends(
                 to_uuid,
                 to_username,
                 to_display_name,
-            )| FriendResponse {
+            )| FriendRequestResponse {
                 id: id as u64,
                 from: AccountResponse {
                     uuid: Uuid::from_slice(&from_uuid).unwrap(),
@@ -190,7 +229,7 @@ pub async fn get_friends(
                 to_uuid,
                 to_username,
                 to_display_name,
-            )| FriendResponse {
+            )| FriendRequestResponse {
                 id: id as u64,
                 from: AccountResponse {
                     uuid: Uuid::from_slice(&from_uuid).unwrap(),

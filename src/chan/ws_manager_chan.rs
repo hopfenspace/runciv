@@ -104,6 +104,11 @@ pub enum WsManagerMessage {
     ///
     /// It will respond through the provided channel
     RetrieveWsCount(oneshot::Sender<u64>),
+    /// Retrieve the online state of the requested accounts by sending this
+    /// message to the ws manager
+    ///
+    /// It will respond through the provided channel.
+    RetrieveOnlineState(Vec<Vec<u8>>, oneshot::Sender<Vec<bool>>),
 }
 
 /// Start the websocket manager
@@ -154,8 +159,19 @@ pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
                     }
                 }
                 WsManagerMessage::RetrieveWsCount(tx) => {
-                    if let Err(err) = tx.send(lookup.values().map(|s| s.len() as u64).sum()) {
-                        error!("Could not send through callback channel: {err}");
+                    let sum = lookup.values().map(|s| s.len() as u64).sum();
+                    if tx.send(sum).is_err() {
+                        error!("Could not send through callback channel");
+                    }
+                }
+                WsManagerMessage::RetrieveOnlineState(accounts, tx) => {
+                    let online_state = accounts
+                        .into_iter()
+                        .map(|a| lookup.contains_key(&a))
+                        .collect();
+
+                    if tx.send(online_state).is_err() {
+                        error!("Could not send through callback channel");
                     }
                 }
             }
