@@ -10,7 +10,6 @@ use bytes::Bytes;
 use log::{debug, error};
 use tokio::sync::Mutex;
 
-use crate::chan::WsManagerMessage::Message;
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::server::handler::ApiError;
 
