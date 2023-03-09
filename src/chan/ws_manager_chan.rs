@@ -49,7 +49,10 @@ pub enum WsMessage {
     /// shutdown
     #[serde(skip)]
     ServerQuitSocket,
-    /// Response to the client if an invalid message was received
+    /// Response to the client if an invalid message was received.
+    ///
+    /// This can occur, if the server can not deserialize the message, the message has a wrong
+    /// type or a message, that should only be sent from the server, is received
     InvalidMessage,
     /// This variant is sent from the client that has finished its turn
     FinishedTurn {
