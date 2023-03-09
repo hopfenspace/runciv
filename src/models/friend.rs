@@ -1,6 +1,6 @@
 use rorm::{ForeignModel, Model, Patch};
 
-use crate::models::Account;
+use crate::models::{Account, ChatRoom};
 
 /// The representation of friends
 ///
@@ -21,6 +21,10 @@ pub struct Friend {
     /// The other user
     #[rorm(on_update = "Cascade", on_delete = "Cascade")]
     pub to: ForeignModel<Account>,
+
+    /// The chatroom of this friend request
+    #[rorm(on_update = "Cascade", on_delete = "Cascade")]
+    pub chat_room: ForeignModel<ChatRoom>,
 }
 
 #[derive(Patch)]

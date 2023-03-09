@@ -3,7 +3,7 @@ use rorm::{BackRef, ForeignModel, Model, Patch};
 use crate::models::Account;
 
 /// This represents a chatroom in the database
-#[derive(Model)]
+#[derive(Model, Debug)]
 pub struct ChatRoom {
     /// The primary key of a chat
     #[rorm(id)]
@@ -23,7 +23,7 @@ pub struct ChatRoom {
 pub(crate) struct ChatRoomInsert {}
 
 /// The member <-> chatroom relation
-#[derive(Model)]
+#[derive(Model, Debug)]
 pub struct ChatRoomMember {
     /// The primary key of a chatroom
     #[rorm(id)]
@@ -51,7 +51,7 @@ pub(crate) struct ChatRoomMemberInsert {
 }
 
 /// A message of a chatroom
-#[derive(Model)]
+#[derive(Model, Debug)]
 pub struct ChatRoomMessage {
     /// The primary key of a chatroom message
     #[rorm(id)]

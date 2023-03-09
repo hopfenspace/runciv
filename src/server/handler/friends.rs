@@ -10,7 +10,9 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
-use crate::models::{Account, Friend, FriendInsert};
+use crate::models::{
+    Account, ChatRoom, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert,
+};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, OnlineAccountResponse};
 
 /// A single friend
@@ -18,6 +20,8 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult, OnlineAccount
 pub struct FriendResponse {
     #[schema(example = 1337)]
     id: u64,
+    #[schema(example = 1337)]
+    chat_id: u64,
     from: AccountResponse,
     to: OnlineAccountResponse,
 }
@@ -85,6 +89,7 @@ pub async fn get_friends(
             Friend::F.to.fields().uuid,
             Friend::F.to.fields().username,
             Friend::F.to.fields().display_name,
+            Friend::F.chat_room,
         )
     )
     .transaction(&mut tx)
@@ -133,10 +138,15 @@ pub async fn get_friends(
                 to_uuid,
                 to_username,
                 to_display_name,
+                chat_room,
             ),
             online,
         )| FriendResponse {
             id: id as u64,
+            chat_id: match chat_room {
+                ForeignModelByField::Key(v) => v,
+                ForeignModelByField::Instance(v) => v.id,
+            } as u64,
             from: AccountResponse {
                 uuid: Uuid::from_slice(&from_uuid).unwrap(),
                 username: from_username,
@@ -448,9 +458,28 @@ pub async fn accept_friend_request(
         .transaction(&mut tx)
         .single(&FriendInsert {
             is_request: false,
-            from: ForeignModelByField::Key(to),
-            to: ForeignModelByField::Key(from),
+            from: ForeignModelByField::Key(to.clone()),
+            to: ForeignModelByField::Key(from.clone()),
         })
+        .await?;
+
+    let chat_room_id = insert!(&db, ChatRoomInsert)
+        .transaction(&mut tx)
+        .single(&ChatRoomInsert {})
+        .await?;
+
+    insert!(&db, ChatRoomMemberInsert)
+        .transaction(&mut tx)
+        .bulk(&[
+            ChatRoomMemberInsert {
+                chat_room: ForeignModelByField::Key(chat_room_id),
+                member: ForeignModelByField::Key(to),
+            },
+            ChatRoomMemberInsert {
+                chat_room: ForeignModelByField::Key(chat_room_id),
+                member: ForeignModelByField::Key(from),
+            },
+        ])
         .await?;
 
     tx.commit().await?;

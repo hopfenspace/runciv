@@ -1,5 +1,5 @@
 [Migration]
-Hash = "17131952317793784035"
+Hash = "11536617260236760423"
 Initial = false
 Dependency = 3
 Replaces = []
@@ -79,6 +79,26 @@ Type = "not_null"
 
 [[Migration.Operations]]
 Type = "CreateField"
+Model = "chatroommessage"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "int64"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "id"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
 Model = "chatroommember"
 
 [Migration.Operations.Field]
@@ -119,7 +139,7 @@ OnUpdate = "Cascade"
 
 [[Migration.Operations]]
 Type = "CreateField"
-Model = "chatroommessage"
+Model = "friend"
 
 [Migration.Operations.Field]
 Name = "chat_room"
