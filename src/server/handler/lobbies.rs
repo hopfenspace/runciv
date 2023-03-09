@@ -17,6 +17,8 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 /// A single lobby
 #[derive(Serialize, ToSchema)]
 pub struct LobbyResponse {
+    #[schema(example = 1337)]
+    id: u64,
     #[schema(example = "Herbert's lobby")]
     name: String,
     #[schema(example = 4)]
@@ -107,6 +109,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     unreachable!("Owner should be queried!")
                 };
                 LobbyResponse {
+                    id: l.id as u64,
                     name: l.name,
                     owner: AccountResponse {
                         uuid: Uuid::from_slice(&owner.uuid).unwrap(),
