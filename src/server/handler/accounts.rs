@@ -367,7 +367,7 @@ pub struct LookupAccountUsernameRequest {
     request_body = LookupAccountUsernameRequest,
     security(("session_cookie" = []))
 )]
-#[post("/accounts/lookupUsername")]
+#[post("/accounts/lookup")]
 pub async fn lookup_account_by_username(
     req: Json<LookupAccountUsernameRequest>,
     db: Data<Database>,
