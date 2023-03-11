@@ -95,6 +95,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     display_name: o_display_name,
                     last_login: None,
                     password_hash: String::new(),
+                    chat_rooms: BackRef { cached: None },
                 })),
                 created_at,
                 max_player,
