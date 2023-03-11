@@ -52,8 +52,7 @@ pub async fn register_account(
         return Err(ApiError::InvalidDisplayName);
     }
 
-    if query!(&db, (Account::F.uuid,))
-        .transaction(&mut tx)
+    if query!(&mut tx, (Account::F.uuid,))
         .condition(Account::F.username.equals(&req.username))
         .optional()
         .await?
@@ -68,8 +67,7 @@ pub async fn register_account(
         .to_string();
 
     let uuid = Uuid::new_v4();
-    insert!(&db, AccountInsert)
-        .transaction(&mut tx)
+    insert!(&mut tx, AccountInsert)
         .single(&AccountInsert {
             uuid: uuid.as_bytes().to_vec(),
             username: req.username.clone(),
@@ -120,7 +118,7 @@ pub struct OnlineAccountResponse {
 pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<AccountResponse>> {
     let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
-    let account = query!(&db, Account)
+    let account = query!(db.as_ref(), Account)
         .condition(Account::F.uuid.equals(&uuid))
         .optional()
         .await?
@@ -152,7 +150,7 @@ pub async fn delete_me(
 ) -> ApiResult<HttpResponse> {
     let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
-    rorm::delete!(&db, Account)
+    rorm::delete!(db.as_ref(), Account)
         .condition(Account::F.uuid.equals(&uuid))
         .await?;
 
@@ -207,8 +205,7 @@ pub async fn set_password(
 
     let mut tx = db.start_transaction().await?;
 
-    let (pw_hash,) = query!(&db, (Account::F.password_hash,))
-        .transaction(&mut tx)
+    let (pw_hash,) = query!(&mut tx, (Account::F.password_hash,))
         .condition(Account::F.uuid.equals(&uuid))
         .optional()
         .await?
@@ -226,8 +223,7 @@ pub async fn set_password(
         .hash_password(req.new_password.as_bytes(), &salt)?
         .to_string();
 
-    update!(&db, Account)
-        .transaction(&mut tx)
+    update!(&mut tx, Account)
         .condition(Account::F.uuid.equals(&uuid))
         .set(Account::F.password_hash, &password_hash)
         .exec()
@@ -273,17 +269,12 @@ pub async fn update_me(
 
     let mut tx = db.start_transaction().await?;
 
-    let mut ub = update!(&db, Account)
-        .condition(Account::F.uuid.equals(&uuid))
-        .begin_dyn_set();
-
     if let Some(username) = &req.username {
         if username.is_empty() {
             return Err(ApiError::InvalidUsername);
         }
 
-        if query!(&db, Account)
-            .transaction(&mut tx)
+        if query!(&mut tx, Account)
             .condition(Account::F.username.equals(username))
             .optional()
             .await?
@@ -291,19 +282,19 @@ pub async fn update_me(
         {
             return Err(ApiError::UsernameAlreadyOccupied);
         }
-
-        ub = ub.set(Account::F.username, username);
     }
 
     if let Some(display_name) = &req.display_name {
         if display_name.is_empty() {
             return Err(ApiError::InvalidDisplayName);
         }
-
-        ub = ub.set(Account::F.display_name, display_name);
     }
 
-    ub.transaction(&mut tx)
+    update!(&mut tx, Account)
+        .condition(Account::F.uuid.equals(&uuid))
+        .begin_dyn_set()
+        .set_if(Account::F.username, req.username.as_ref())
+        .set_if(Account::F.display_name, req.display_name.as_ref())
         .finish_dyn_set()
         .map_err(|_| ApiError::EmptyJson)?
         .exec()
@@ -335,8 +326,8 @@ pub async fn lookup_account_by_uuid(
     req: Path<PathUuid>,
     db: Data<Database>,
 ) -> ApiResult<Json<AccountResponse>> {
-    let account = query!(&db, Account)
-        .condition(Account::F.uuid.equals(&req.uuid))
+    let account = query!(db.as_ref(), Account)
+        .condition(Account::F.uuid.equals(req.uuid.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -380,7 +371,7 @@ pub async fn lookup_account_by_username(
     req: Json<LookupAccountUsernameRequest>,
     db: Data<Database>,
 ) -> ApiResult<Json<AccountResponse>> {
-    let account = query!(&db, Account)
+    let account = query!(db.as_ref(), Account)
         .condition(Account::F.username.equals(&req.username))
         .optional()
         .await?

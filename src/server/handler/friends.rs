@@ -2,7 +2,7 @@ use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
 use log::error;
-use rorm::internal::field::foreign_model::ForeignModelByField;
+use rorm::fields::ForeignModelByField;
 use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -78,19 +78,18 @@ pub async fn get_friends(
     let mut friend_requests = vec![];
 
     let friends_raw = query!(
-        &db,
+        &mut tx,
         (
             Friend::F.id,
-            Friend::F.from.fields().uuid,
-            Friend::F.from.fields().username,
-            Friend::F.from.fields().display_name,
-            Friend::F.to.fields().uuid,
-            Friend::F.to.fields().username,
-            Friend::F.to.fields().display_name,
+            Friend::F.from.uuid,
+            Friend::F.from.username,
+            Friend::F.from.display_name,
+            Friend::F.to.uuid,
+            Friend::F.to.username,
+            Friend::F.to.display_name,
             Friend::F.chat_room,
         )
     )
-    .transaction(&mut tx)
     .condition(and!(
         Friend::F.from.equals(&uuid),
         Friend::F.is_request.equals(false)
@@ -141,10 +140,7 @@ pub async fn get_friends(
             online,
         )| FriendResponse {
             id: id as u64,
-            chat_id: match chat_room {
-                ForeignModelByField::Key(v) => v,
-                ForeignModelByField::Instance(v) => v.id,
-            } as u64,
+            chat_id: *chat_room.key() as u64,
             from: AccountResponse {
                 uuid: Uuid::from_slice(&from_uuid).unwrap(),
                 username: from_username,
@@ -162,18 +158,17 @@ pub async fn get_friends(
     // Retrieve all incoming requests
     friend_requests.extend(
         query!(
-            &db,
+            &mut tx,
             (
                 Friend::F.id,
-                Friend::F.from.fields().uuid,
-                Friend::F.from.fields().username,
-                Friend::F.from.fields().display_name,
-                Friend::F.to.fields().uuid,
-                Friend::F.to.fields().username,
-                Friend::F.to.fields().display_name,
+                Friend::F.from.uuid,
+                Friend::F.from.username,
+                Friend::F.from.display_name,
+                Friend::F.to.uuid,
+                Friend::F.to.username,
+                Friend::F.to.display_name,
             )
         )
-        .transaction(&mut tx)
         .condition(and!(
             Friend::F.to.equals(&uuid),
             Friend::F.is_request.equals(true)
@@ -209,18 +204,17 @@ pub async fn get_friends(
     // Retrieve all outgoing requests
     friend_requests.extend(
         query!(
-            &db,
+            &mut tx,
             (
                 Friend::F.id,
-                Friend::F.from.fields().uuid,
-                Friend::F.from.fields().username,
-                Friend::F.from.fields().display_name,
-                Friend::F.to.fields().uuid,
-                Friend::F.to.fields().username,
-                Friend::F.to.fields().display_name,
+                Friend::F.from.uuid,
+                Friend::F.from.username,
+                Friend::F.from.display_name,
+                Friend::F.to.uuid,
+                Friend::F.to.username,
+                Friend::F.to.display_name,
             )
         )
-        .transaction(&mut tx)
         .condition(and!(
             Friend::F.from.equals(&uuid),
             Friend::F.is_request.equals(true)
@@ -291,16 +285,14 @@ pub async fn create_friend_request(
     let mut tx = db.start_transaction().await?;
 
     // Check if target exists
-    let target = query!(&db, Account)
-        .transaction(&mut tx)
+    let target = query!(&mut tx, Account)
         .condition(Account::F.uuid.equals(req.uuid.as_bytes().as_slice()))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUsername)?;
 
     // Check if users are already in a friendship
-    if let Some(friendship) = query!(&db, Friend)
-        .transaction(&mut tx)
+    if let Some(friendship) = query!(&mut tx, Friend)
         .condition(or!(
             and!(
                 Friend::F.from.equals(&uuid),
@@ -322,8 +314,7 @@ pub async fn create_friend_request(
     }
 
     // Create new friendship request
-    insert!(&db, FriendInsert)
-        .transaction(&mut tx)
+    insert!(&mut tx, FriendInsert)
         .single(&FriendInsert {
             is_request: true,
             from: ForeignModelByField::Key(uuid),
@@ -366,8 +357,7 @@ pub async fn delete_friend(
     let mut tx = db.start_transaction().await?;
 
     // Check if friend exists
-    let f = query!(&db, Friend)
-        .transaction(&mut tx)
+    let f = query!(&mut tx, Friend)
         .condition(Friend::F.id.equals(path.id as i64))
         .optional()
         .await?
@@ -388,10 +378,7 @@ pub async fn delete_friend(
         return Err(ApiError::MissingPrivileges);
     }
 
-    rorm::delete!(&db, Friend)
-        .transaction(&mut tx)
-        .single(&f)
-        .await?;
+    rorm::delete!(&mut tx, Friend).single(&f).await?;
 
     tx.commit().await?;
 
@@ -421,8 +408,7 @@ pub async fn accept_friend_request(
     let mut tx = db.start_transaction().await?;
 
     // Check if friend request exists
-    let f = query!(&db, Friend)
-        .transaction(&mut tx)
+    let f = query!(&mut tx, Friend)
         .condition(and!(
             Friend::F.id.equals(path.id as i64),
             Friend::F.is_request.equals(true)
@@ -446,14 +432,12 @@ pub async fn accept_friend_request(
         return Err(ApiError::MissingPrivileges);
     }
 
-    update!(&db, Friend)
-        .transaction(&mut tx)
+    update!(&mut tx, Friend)
         .set(Friend::F.is_request, false)
         .exec()
         .await?;
 
-    insert!(&db, FriendInsert)
-        .transaction(&mut tx)
+    insert!(&mut tx, FriendInsert)
         .single(&FriendInsert {
             is_request: false,
             from: ForeignModelByField::Key(to.clone()),
@@ -461,13 +445,12 @@ pub async fn accept_friend_request(
         })
         .await?;
 
-    let chat_room_id = insert!(&db, ChatRoomInsert)
-        .transaction(&mut tx)
+    let chat_room_id = insert!(&mut tx, ChatRoomInsert)
+        .return_primary_key()
         .single(&ChatRoomInsert {})
         .await?;
 
-    insert!(&db, ChatRoomMemberInsert)
-        .transaction(&mut tx)
+    insert!(&mut tx, ChatRoomMemberInsert)
         .bulk(&[
             ChatRoomMemberInsert {
                 chat_room: ForeignModelByField::Key(chat_room_id),

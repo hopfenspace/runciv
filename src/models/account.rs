@@ -1,9 +1,10 @@
-use rorm::{BackRef, Model, Patch};
+use rorm::fields::BackRef;
+use rorm::{field, Model, Patch};
 
 use crate::models::ChatRoomMember;
 
 /// A user account
-#[derive(Debug, Model)]
+#[derive(Model)]
 pub struct Account {
     /// The primary key of a user.
     ///
@@ -27,8 +28,7 @@ pub struct Account {
     pub last_login: Option<chrono::NaiveDateTime>,
 
     /// The chat rooms this account is part of
-    #[rorm(field = "ChatRoomMember::F.member")]
-    pub chat_rooms: BackRef<ChatRoomMember>,
+    pub chat_rooms: BackRef<field!(ChatRoomMember::F.member)>,
 }
 
 #[derive(Patch)]

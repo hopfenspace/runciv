@@ -1,11 +1,12 @@
-use rorm::{ForeignModel, Model, Patch};
+use rorm::fields::ForeignModel;
+use rorm::{Model, Patch};
 
 use crate::models::{Account, ChatRoom};
 
 /// The representation of friends
 ///
 /// This model has to be created 2 times for every relation.
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct Friend {
     /// Primary key of this friend pair
     #[rorm(id)]

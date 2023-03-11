@@ -5,8 +5,8 @@ use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use chrono::{DateTime, Utc};
 use rand::thread_rng;
-use rorm::internal::field::foreign_model::ForeignModelByField;
-use rorm::{insert, query, BackRef, Database, Model};
+use rorm::fields::{BackRef, ForeignModelByField};
+use rorm::{insert, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -55,18 +55,20 @@ pub struct GetLobbiesResponse {
 )]
 #[get("/lobbies")]
 pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesResponse>> {
+    let mut tx = db.start_transaction().await?;
+
     let lobbies = query!(
-        &db,
+        &mut tx,
         (
             Lobby::F.id,
-            Lobby::F.owner.f().uuid,
-            Lobby::F.owner.f().username,
-            Lobby::F.owner.f().display_name,
+            Lobby::F.owner.uuid,
+            Lobby::F.owner.username,
+            Lobby::F.owner.display_name,
             Lobby::F.name,
             Lobby::F.created_at,
             Lobby::F.max_player,
             Lobby::F.password_hash,
-            Lobby::F.chat_room.f().id,
+            Lobby::F.chat_room.id,
         )
     )
     .all()
@@ -105,9 +107,10 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
         )
         .collect();
 
-    for lobby in &mut lobbies {
-        Lobby::F.current_player.populate(&db, lobby).await?;
-    }
+    Lobby::F
+        .current_player
+        .populate_bulk(&mut tx, &mut lobbies)
+        .await?;
 
     Ok(Json(GetLobbiesResponse {
         lobbies: lobbies
@@ -128,10 +131,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     max_players: l.max_player as u8,
                     password: l.password_hash.is_some(),
                     created_at: DateTime::from_utc(l.created_at, Utc),
-                    chat_room_id: match l.chat_room {
-                        ForeignModelByField::Key(k) => k as u64,
-                        ForeignModelByField::Instance(x) => x.id as u64,
-                    },
+                    chat_room_id: *l.chat_room.key() as u64,
                 }
             })
             .collect(),
@@ -194,8 +194,7 @@ pub async fn create_lobby(
     }
 
     // Check if the executing account is already in a lobby
-    if query!(&db, (LobbyAccount::F.id,))
-        .transaction(&mut tx)
+    if query!(&mut tx, (LobbyAccount::F.id,))
         .condition(LobbyAccount::F.player.equals(&uuid))
         .optional()
         .await?
@@ -204,8 +203,7 @@ pub async fn create_lobby(
         return Err(ApiError::AlreadyInALobby);
     }
 
-    if query!(&db, (Lobby::F.id,))
-        .transaction(&mut tx)
+    if query!(&mut tx, (Lobby::F.id,))
         .condition(Lobby::F.owner.equals(&uuid))
         .optional()
         .await?
@@ -232,14 +230,13 @@ pub async fn create_lobby(
     };
 
     // Create chatroom for lobby
-    let chat_room_id = insert!(&db, ChatRoomInsert)
-        .transaction(&mut tx)
+    let chat_room_id = insert!(&mut tx, ChatRoomInsert)
+        .return_primary_key()
         .single(&ChatRoomInsert {})
         .await?;
 
     // Place current user in chat
-    insert!(&db, ChatRoomMemberInsert)
-        .transaction(&mut tx)
+    insert!(&mut tx, ChatRoomMemberInsert)
         .single(&ChatRoomMemberInsert {
             chat_room: ForeignModelByField::Key(chat_room_id),
             member: ForeignModelByField::Key(uuid.clone()),
@@ -247,8 +244,8 @@ pub async fn create_lobby(
         .await?;
 
     // Create lobby
-    let id = insert!(&db, LobbyInsert)
-        .transaction(&mut tx)
+    let id = insert!(&mut tx, LobbyInsert)
+        .return_primary_key()
         .single(&LobbyInsert {
             name: req.name.clone(),
             password_hash: pw_hash,

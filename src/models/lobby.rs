@@ -1,11 +1,12 @@
-use rorm::{BackRef, ForeignModel, Model, Patch};
+use rorm::fields::{BackRef, ForeignModel};
+use rorm::{field, Model, Patch};
 
 use crate::models::{Account, ChatRoom};
 
 /// The lobby is the game state in which the game has not started yet.
 ///
 /// If the game has started, the lobby should be deleted.
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct Lobby {
     /// Primary key of the lobby
     #[rorm(id)]
@@ -24,8 +25,7 @@ pub struct Lobby {
     pub password_hash: Option<String>,
 
     /// The player that are currently in this lobby
-    #[rorm(field = "LobbyAccount::F.lobby")]
-    pub current_player: BackRef<LobbyAccount>,
+    pub current_player: BackRef<field!(LobbyAccount::F.lobby)>,
 
     /// The maximum count of players
     pub max_player: i16,
@@ -50,7 +50,7 @@ pub(crate) struct LobbyInsert {
 }
 
 /// The m2m relation between lobby and accounts
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct LobbyAccount {
     /// Primary key of a lobby player
     #[rorm(id)]

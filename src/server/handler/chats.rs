@@ -97,56 +97,50 @@ pub async fn get_chat(
 
     let mut tx = db.start_transaction().await?;
 
-    query!(&db, (ChatRoom::F.id,))
-        .transaction(&mut tx)
+    query!(&mut tx, (ChatRoom::F.id,))
         .condition(ChatRoom::F.id.equals(path.id as i64))
         .optional()
         .await?
         .ok_or(ApiError::InvalidId)?;
 
     // Check if user is allowed to access chat data
-    let user_count = query!(&db, (ChatRoomMember::F.id.count(),))
-        .transaction(&mut tx)
+    let user_count = query!(&mut tx, (ChatRoomMember::F.id.count(),))
         .condition(and!(
             ChatRoomMember::F.chat_room.equals(path.id as i64),
-            ChatRoomMember::F.member.f().uuid.equals(&uuid)
+            ChatRoomMember::F.member.uuid.equals(&uuid)
         ))
         .one()
         .await?
-        .0
-        // This unwrap is fine as count always return a value
-        .unwrap();
+        .0;
 
     if user_count == 0 {
         return Err(ApiError::MissingPrivileges);
     }
 
     let members = query!(
-        &db,
+        &mut tx,
         (
             ChatRoomMember::F.created_at,
-            ChatRoomMember::F.member.f().uuid,
-            ChatRoomMember::F.member.f().username,
-            ChatRoomMember::F.member.f().display_name
+            ChatRoomMember::F.member.uuid,
+            ChatRoomMember::F.member.username,
+            ChatRoomMember::F.member.display_name
         )
     )
-    .transaction(&mut tx)
     .condition(ChatRoomMember::F.chat_room.equals(path.id as i64))
     .all()
     .await?;
 
     let messages = query!(
-        &db,
+        &mut tx,
         (
             ChatRoomMessage::F.id,
             ChatRoomMessage::F.message,
             ChatRoomMessage::F.created_at,
-            ChatRoomMessage::F.sender.f().uuid,
-            ChatRoomMessage::F.sender.f().username,
-            ChatRoomMessage::F.sender.f().display_name
+            ChatRoomMessage::F.sender.uuid,
+            ChatRoomMessage::F.sender.username,
+            ChatRoomMessage::F.sender.display_name
         )
     )
-    .transaction(&mut tx)
     .condition(ChatRoomMessage::F.chat_room.equals(path.id as i64))
     .all()
     .await?;
@@ -219,18 +213,16 @@ pub async fn get_all_chats(
 
     let mut tx = db.start_transaction().await?;
 
-    let friend_chat_room_ids = query!(&db, (Friend::F.chat_room.f().id,))
-        .transaction(&mut tx)
+    let friend_chat_room_ids = query!(&mut tx, (Friend::F.chat_room.id,))
         .condition(and!(
             Friend::F.is_request.equals(false),
-            Friend::F.from.f().uuid.equals(&uuid)
+            Friend::F.from.uuid.equals(&uuid)
         ))
         .all()
         .await?;
 
-    let lobby_chat_room_ids = query!(&db, (LobbyAccount::F.lobby.f().chat_room.f().id))
-        .transaction(&mut tx)
-        .condition(LobbyAccount::F.player.f().uuid.equals(&uuid))
+    let lobby_chat_room_ids = query!(&mut tx, (LobbyAccount::F.lobby.chat_room.id))
+        .condition(LobbyAccount::F.player.uuid.equals(&uuid))
         .all()
         .await?;
 

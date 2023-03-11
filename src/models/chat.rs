@@ -1,21 +1,20 @@
-use rorm::{BackRef, ForeignModel, Model, Patch};
+use rorm::fields::{BackRef, ForeignModel};
+use rorm::{field, Model, Patch};
 
 use crate::models::Account;
 
 /// This represents a chatroom in the database
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct ChatRoom {
     /// The primary key of a chat
     #[rorm(id)]
     pub id: i64,
 
     /// A backref to the members of a specific chatroom
-    #[rorm(field = "ChatRoomMember::F.chat_room")]
-    pub members: BackRef<ChatRoomMember>,
+    pub members: BackRef<field!(ChatRoomMember::F.chat_room)>,
 
     /// A backref to the members of a specific chatroom
-    #[rorm(field = "ChatRoomMessage::F.chat_room")]
-    pub messages: BackRef<ChatRoomMessage>,
+    pub messages: BackRef<field!(ChatRoomMessage::F.chat_room)>,
 }
 
 #[derive(Patch)]
@@ -23,7 +22,7 @@ pub struct ChatRoom {
 pub(crate) struct ChatRoomInsert;
 
 /// The member <-> chatroom relation
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct ChatRoomMember {
     /// The primary key of a chatroom
     #[rorm(id)]
@@ -51,7 +50,7 @@ pub(crate) struct ChatRoomMemberInsert {
 }
 
 /// A message of a chatroom
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct ChatRoomMessage {
     /// The primary key of a chatroom message
     #[rorm(id)]

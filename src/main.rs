@@ -16,8 +16,8 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use rorm::config::DatabaseConfig;
-use rorm::{Database, DatabaseConfiguration, DatabaseDriver};
+use rorm::cli::config as cli_config;
+use rorm::{cli, Database, DatabaseConfiguration, DatabaseDriver};
 
 use crate::chan::start_ws_manager;
 use crate::config::Config;
@@ -83,10 +83,10 @@ async fn main() -> Result<(), String> {
         }
         Command::Migrate { migration_dir } => {
             let conf = get_conf(&cli.config_path)?;
-            rorm_cli::migrate::run_migrate_custom(
-                DatabaseConfig {
+            cli::migrate::run_migrate_custom(
+                cli_config::DatabaseConfig {
                     last_migration_table_name: None,
-                    driver: DatabaseDriver::Postgres {
+                    driver: cli_config::DatabaseDriver::Postgres {
                         host: conf.database.host,
                         port: conf.database.port,
                         name: conf.database.name,

@@ -38,13 +38,10 @@ pub async fn health(
     db: Data<Database>,
     ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<Json<HealthResponse>> {
-    // The unwrap is called as count() currently assumes to have an Option as return type, which
-    // is not correct in SQL.
-    let accounts = query!(&db, (Account::F.uuid.count(),))
+    let accounts = query!(db.as_ref(), (Account::F.uuid.count(),))
         .one()
         .await?
-        .0
-        .unwrap() as u64;
+        .0 as u64;
 
     let (tx, rx) = oneshot::channel();
 

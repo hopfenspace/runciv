@@ -45,8 +45,7 @@ pub(crate) async fn login(
 ) -> ApiResult<HttpResponse> {
     let mut tx = db.start_transaction().await?;
 
-    let user = query!(&db, Account)
-        .transaction(&mut tx)
+    let user = query!(&mut tx, Account)
         .condition(Account::F.username.equals(&req.username))
         .optional()
         .await?
@@ -62,8 +61,7 @@ pub(crate) async fn login(
             _ => ApiError::InvalidHash(e),
         })?;
 
-    update!(&db, Account)
-        .transaction(&mut tx)
+    update!(&mut tx, Account)
         .condition(Account::F.uuid.equals(&user.uuid))
         .set(Account::F.last_login, Some(Utc::now().naive_utc()))
         .exec()
