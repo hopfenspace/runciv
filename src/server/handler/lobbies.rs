@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::models::{Account, Lobby, LobbyAccount, LobbyInsert};
+use crate::models::{
+    Account, ChatRoomInsert, ChatRoomMemberInsert, Lobby, LobbyAccount, LobbyInsert,
+};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 
 /// A single lobby
@@ -28,6 +30,8 @@ pub struct LobbyResponse {
     created_at: DateTime<Utc>,
     password: bool,
     owner: AccountResponse,
+    #[schema(example = 1337)]
+    chat_room_id: u64,
 }
 
 /// The lobbies that are open
@@ -62,6 +66,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
             Lobby::F.created_at,
             Lobby::F.max_player,
             Lobby::F.password_hash,
+            Lobby::F.chat_room.f().id,
         )
     )
     .all()
@@ -79,6 +84,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 created_at,
                 max_player,
                 password_hash,
+                chat_room_id,
             )| Lobby {
                 id,
                 name,
@@ -93,6 +99,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 created_at,
                 max_player,
                 password_hash,
+                chat_room: ForeignModelByField::Key(chat_room_id),
             },
         )
         .collect();
@@ -120,6 +127,10 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     max_players: l.max_player as u8,
                     password: l.password_hash.is_some(),
                     created_at: DateTime::from_utc(l.created_at, Utc),
+                    chat_room_id: match l.chat_room {
+                        ForeignModelByField::Key(k) => k as u64,
+                        ForeignModelByField::Instance(x) => x.id as u64,
+                    },
                 }
             })
             .collect(),
@@ -141,10 +152,11 @@ pub struct CreateLobbyRequest {
 
 /// The response of a create lobby request.
 ///
-/// It contains the id of the created lobby
+/// It contains the id of the created lobby and the id of the created chatroom for the lobby
 #[derive(Serialize, ToSchema)]
 pub struct CreateLobbyResponse {
     lobby_id: u64,
+    lobby_chat_room_id: u64,
 }
 
 /// Create a new lobby
@@ -152,6 +164,8 @@ pub struct CreateLobbyResponse {
 /// If you are already in another lobby, an error is returned.
 /// `max_players` must be between 2 and 34 (inclusive).
 /// If `password` is an empty string, an error is returned.
+///
+/// You are placed in
 #[utoipa::path(
     tag = "Lobbies",
     context_path = "/api/v2",
@@ -216,6 +230,21 @@ pub async fn create_lobby(
         None
     };
 
+    // Create chatroom for lobby
+    let chat_room_id = insert!(&db, ChatRoomInsert)
+        .transaction(&mut tx)
+        .single(&ChatRoomInsert {})
+        .await?;
+
+    // Place current user in chat
+    insert!(&db, ChatRoomMemberInsert)
+        .transaction(&mut tx)
+        .single(&ChatRoomMemberInsert {
+            chat_room: ForeignModelByField::Key(chat_room_id),
+            member: ForeignModelByField::Key(uuid.clone()),
+        })
+        .await?;
+
     // Create lobby
     let id = insert!(&db, LobbyInsert)
         .transaction(&mut tx)
@@ -224,6 +253,7 @@ pub async fn create_lobby(
             password_hash: pw_hash,
             max_player: req.max_players as i16,
             owner: ForeignModelByField::Key(uuid),
+            chat_room: ForeignModelByField::Key(chat_room_id),
         })
         .await?;
 
@@ -231,5 +261,6 @@ pub async fn create_lobby(
 
     Ok(Json(CreateLobbyResponse {
         lobby_id: id as u64,
+        lobby_chat_room_id: chat_room_id as u64,
     }))
 }

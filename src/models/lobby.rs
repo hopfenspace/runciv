@@ -1,6 +1,6 @@
 use rorm::{BackRef, ForeignModel, Model, Patch};
 
-use crate::models::Account;
+use crate::models::{Account, ChatRoom};
 
 /// The lobby is the game state in which the game has not started yet.
 ///
@@ -30,6 +30,10 @@ pub struct Lobby {
     /// The maximum count of players
     pub max_player: i16,
 
+    /// The chatroom of the lobby
+    #[rorm(on_update = "Cascade", on_delete = "Cascade")]
+    pub chat_room: ForeignModel<ChatRoom>,
+
     /// The point in time, the lobby was created
     #[rorm(auto_create_time)]
     pub created_at: chrono::NaiveDateTime,
@@ -41,6 +45,7 @@ pub(crate) struct LobbyInsert {
     pub(crate) name: String,
     pub(crate) owner: ForeignModel<Account>,
     pub(crate) password_hash: Option<String>,
+    pub(crate) chat_room: ForeignModel<ChatRoom>,
     pub(crate) max_player: i16,
 }
 

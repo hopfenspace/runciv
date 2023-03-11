@@ -1995,9 +1995,9 @@ dependencies = [
 
 [[package]]
 name = "rorm"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4c9520561072b6f7e7bc5f9b99ef0952d19edb08b04c8dd0444a1a240a8174d"
+checksum = "278f96464e047f7fe4b56370042b11de87d85cfc99957d599fdaa59d33c54426"
 dependencies = [
  "chrono",
  "futures",
@@ -2958,9 +2958,9 @@ checksum = "5190c9442dcdaf0ddd50f37420417d219ae5261bbf5db120d0f9bab996c9cba1"
 
 [[package]]
 name = "utoipa"
-version = "3.0.3"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15f6da6a2b471134ca44b7d18e8a76d73035cf8b3ed24c4dd5ca6a63aa439c5"
+checksum = "d9376d225846fe53ab3425916eba3736936f19bdd5dbfe46604e9cc6a28ed411"
 dependencies = [
  "indexmap",
  "serde",
@@ -2970,9 +2970,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-gen"
-version = "3.0.3"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f2e33027986a4707b3f5c37ed01b33d0e5a53da30204b52ff18f80600f1d0ec"
+checksum = "a1d050a2b5851b1d1aaa976854af782491298052e29fdfe47ca37872e2b3aa99"
 dependencies = [
  "lazy_static",
  "proc-macro-error",
@@ -2985,9 +2985,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-swagger-ui"
-version = "3.0.2"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae3d4f4da6408f0f20ff58196ed619c94306ab32635aeca3d3fa0768c0bd0de2"
+checksum = "c745a5ecb9f3b1b30780e45cc4ad77b3bdd76501319570046e4db7318e3c4381"
 dependencies = [
  "actix-web",
  "mime_guess",
