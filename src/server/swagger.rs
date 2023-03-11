@@ -40,6 +40,7 @@ impl Modify for CookieSecurity {
         handler::lookup_account_by_uuid,
         handler::lookup_account_by_username,
         handler::get_chat,
+        handler::get_all_chats,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -63,6 +64,7 @@ impl Modify for CookieSecurity {
         handler::GetChatResponse,
         handler::ChatMessage,
         handler::ChatMember,
+        handler::GetAllChatsResponse,
     )),
     modifiers(&CookieSecurity)
 )]

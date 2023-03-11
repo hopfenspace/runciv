@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::models::{ChatRoom, ChatRoomMember, ChatRoomMessage};
+use crate::models::{ChatRoom, ChatRoomMember, ChatRoomMessage, Friend, LobbyAccount};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 
 /// The message of a chatroom
@@ -184,6 +184,66 @@ pub async fn get_chat(
                     },
                 },
             )
+            .collect(),
+    }))
+}
+
+/// All chat rooms your user has access to
+#[derive(Serialize, ToSchema)]
+pub struct GetAllChatsResponse {
+    #[schema(example = "[1337]")]
+    friend_chat_rooms: Vec<u64>,
+    #[schema(example = "[1337]")]
+    lobby_chat_rooms: Vec<u64>,
+}
+
+/// Retrieve all chats the executing user has access to.
+///
+/// In the response, you will find different categories.
+#[utoipa::path(
+    tag = "Chats",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns the messages of the chat room", body = GetAllChatsResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    security(("session_cookie" = []))
+)]
+#[get("/chats")]
+pub async fn get_all_chats(
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<Json<GetAllChatsResponse>> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    let friend_chat_room_ids = query!(&db, (Friend::F.chat_room.f().id,))
+        .transaction(&mut tx)
+        .condition(and!(
+            Friend::F.is_request.equals(false),
+            Friend::F.from.f().uuid.equals(&uuid)
+        ))
+        .all()
+        .await?;
+
+    let lobby_chat_room_ids = query!(&db, (LobbyAccount::F.lobby.f().chat_room.f().id))
+        .transaction(&mut tx)
+        .condition(LobbyAccount::F.player.f().uuid.equals(&uuid))
+        .all()
+        .await?;
+
+    tx.commit().await?;
+
+    Ok(Json(GetAllChatsResponse {
+        lobby_chat_rooms: lobby_chat_room_ids
+            .into_iter()
+            .map(|(x,)| x as u64)
+            .collect(),
+        friend_chat_rooms: friend_chat_room_ids
+            .into_iter()
+            .map(|(x,)| x as u64)
             .collect(),
     }))
 }
