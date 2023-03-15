@@ -10,7 +10,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use uuid::Uuid;
 
-use crate::server::handler::ChatMessage;
+use crate::server::handler::{AccountResponse, ChatMessage};
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
     while let Some(msg) = rx.recv().await {
@@ -97,6 +97,15 @@ pub enum WsMessage {
         chat_id: u64,
         /// The new message
         message: ChatMessage,
+    },
+    /// An invite is sent to the client.
+    IncomingInvite {
+        /// The id of the invite
+        invite_id: u64,
+        /// The user that invoked the invite
+        from: AccountResponse,
+        /// The lobby to join
+        lobby_id: u64,
     },
 }
 

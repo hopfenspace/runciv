@@ -24,8 +24,8 @@ use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
-    accept_friend_request, create_friend_request, create_lobby, delete_friend, delete_me,
-    get_all_chats, get_chat, get_friends, get_lobbies, get_me, health, login, logout,
+    accept_friend_request, create_friend_request, create_invite, create_lobby, delete_friend,
+    delete_me, get_all_chats, get_chat, get_friends, get_lobbies, get_me, health, login, logout,
     lookup_account_by_username, lookup_account_by_uuid, register_account, set_password, update_me,
     version, websocket, welcome_page,
 };
@@ -125,7 +125,8 @@ pub async fn start_server(
                     .service(get_lobbies)
                     .service(create_lobby)
                     .service(get_chat)
-                    .service(get_all_chats),
+                    .service(get_all_chats)
+                    .service(create_invite),
             )
     })
     .bind(s_addr)?

@@ -3,9 +3,11 @@
 pub use account::*;
 pub use chat::*;
 pub use friend::*;
+pub use invite::*;
 pub use lobby::*;
 
 mod account;
 mod chat;
 mod friend;
+mod invite;
 mod lobby;
