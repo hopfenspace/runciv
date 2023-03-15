@@ -93,7 +93,7 @@ pub async fn get_chat(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GetChatResponse>> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
@@ -107,7 +107,7 @@ pub async fn get_chat(
     let user_count = query!(&mut tx, (ChatRoomMember::F.id.count(),))
         .condition(and!(
             ChatRoomMember::F.chat_room.equals(path.id as i64),
-            ChatRoomMember::F.member.uuid.equals(&uuid)
+            ChatRoomMember::F.member.uuid.equals(uuid.as_ref())
         ))
         .one()
         .await?
@@ -157,7 +157,7 @@ pub async fn get_chat(
                         message,
                         created_at: DateTime::from_utc(created_at, Utc),
                         sender: AccountResponse {
-                            uuid: Uuid::from_slice(&sender_uuid).unwrap(),
+                            uuid: sender_uuid,
                             username: sender_username,
                             display_name: sender_display_name,
                         },
@@ -172,7 +172,7 @@ pub async fn get_chat(
                 |(created_at, m_uuid, m_username, m_display_name)| ChatMember {
                     joined_at: DateTime::from_utc(created_at, Utc),
                     account: AccountResponse {
-                        uuid: Uuid::from_slice(&m_uuid).unwrap(),
+                        uuid: m_uuid,
                         username: m_username,
                         display_name: m_display_name,
                     },
@@ -209,20 +209,20 @@ pub async fn get_all_chats(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GetAllChatsResponse>> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
     let friend_chat_room_ids = query!(&mut tx, (Friend::F.chat_room.id,))
         .condition(and!(
             Friend::F.is_request.equals(false),
-            Friend::F.from.uuid.equals(&uuid)
+            Friend::F.from.uuid.equals(uuid.as_ref())
         ))
         .all()
         .await?;
 
     let lobby_chat_room_ids = query!(&mut tx, (LobbyAccount::F.lobby.chat_room.id))
-        .condition(LobbyAccount::F.player.uuid.equals(&uuid))
+        .condition(LobbyAccount::F.player.uuid.equals(uuid.as_ref()))
         .all()
         .await?;
 

@@ -123,7 +123,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     id: l.id as u64,
                     name: l.name,
                     owner: AccountResponse {
-                        uuid: Uuid::from_slice(&owner.uuid).unwrap(),
+                        uuid: owner.uuid.clone(),
                         username: owner.username.clone(),
                         display_name: owner.display_name.clone(),
                     },
@@ -184,7 +184,7 @@ pub async fn create_lobby(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<CreateLobbyResponse>> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
@@ -195,7 +195,7 @@ pub async fn create_lobby(
 
     // Check if the executing account is already in a lobby
     if query!(&mut tx, (LobbyAccount::F.id,))
-        .condition(LobbyAccount::F.player.equals(&uuid))
+        .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
         .optional()
         .await?
         .is_some()
@@ -204,7 +204,7 @@ pub async fn create_lobby(
     }
 
     if query!(&mut tx, (Lobby::F.id,))
-        .condition(Lobby::F.owner.equals(&uuid))
+        .condition(Lobby::F.owner.equals(uuid.as_ref()))
         .optional()
         .await?
         .is_some()

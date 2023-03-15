@@ -10,6 +10,7 @@ use log::error;
 use rorm::{query, update, Database, Model};
 use serde::Deserialize;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::Account;
@@ -62,7 +63,7 @@ pub(crate) async fn login(
         })?;
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(&user.uuid))
+        .condition(Account::F.uuid.equals(user.uuid.as_ref()))
         .set(Account::F.last_login, Some(Utc::now().naive_utc()))
         .exec()
         .await?;
@@ -92,7 +93,7 @@ pub(crate) async fn logout(
     session: Session,
     ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     session.purge();
 

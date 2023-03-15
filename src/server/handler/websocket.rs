@@ -11,6 +11,7 @@ use bytestring::ByteString;
 use log::{debug, error};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::server::handler::ApiError;
@@ -48,7 +49,7 @@ pub async fn websocket(
     session: Session,
     ws_manager_chan: Data<WsManagerChan>,
 ) -> actix_web::Result<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let (tx, mut rx, response) = ws::start(&req, payload)?;
 

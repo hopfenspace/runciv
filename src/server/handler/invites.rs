@@ -43,7 +43,7 @@ pub async fn create_invite(
     db: Data<Database>,
     ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
@@ -59,7 +59,7 @@ pub async fn create_invite(
         && query!(&mut tx, LobbyAccount)
             .condition(and!(
                 LobbyAccount::F.lobby.equals(lobby.id),
-                LobbyAccount::F.player.equals(&uuid)
+                LobbyAccount::F.player.equals(uuid.as_ref())
             ))
             .optional()
             .await?
@@ -79,8 +79,8 @@ pub async fn create_invite(
     let friend = query!(&mut tx, Friend)
         .condition(and!(
             Friend::F.is_request.equals(false),
-            Friend::F.from.equals(&uuid),
-            Friend::F.to.equals(&friend_account.uuid)
+            Friend::F.from.equals(uuid.as_ref()),
+            Friend::F.to.equals(friend_account.uuid.as_ref())
         ))
         .optional()
         .await?
@@ -96,7 +96,7 @@ pub async fn create_invite(
         .await?;
 
     let executing_account = query!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
@@ -107,7 +107,7 @@ pub async fn create_invite(
         invite_id: invite_id as u64,
         lobby_id: lobby.id as u64,
         from: AccountResponse {
-            uuid: Uuid::from_slice(&executing_account.uuid).unwrap(),
+            uuid: executing_account.uuid,
             username: executing_account.username,
             display_name: executing_account.display_name,
         },
@@ -156,7 +156,7 @@ pub async fn get_invites(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GetInvitesResponse>> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let invites = query!(
         db.as_ref(),
@@ -169,7 +169,7 @@ pub async fn get_invites(
             Invite::F.created_at
         )
     )
-    .condition(Invite::F.to.equals(&uuid))
+    .condition(Invite::F.to.equals(uuid.as_ref()))
     .all()
     .await?;
 
@@ -183,7 +183,7 @@ pub async fn get_invites(
                         lobby_id: lobby_id as u64,
                         created_at: DateTime::from_utc(created_at, Utc),
                         from: AccountResponse {
-                            uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                            uuid: from_uuid,
                             username: from_username,
                             display_name: from_display_name,
                         },

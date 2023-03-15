@@ -69,7 +69,7 @@ pub async fn register_account(
     let uuid = Uuid::new_v4();
     insert!(&mut tx, AccountInsert)
         .single(&AccountInsert {
-            uuid: uuid.as_bytes().to_vec(),
+            uuid,
             username: req.username.clone(),
             display_name: req.display_name.clone(),
             password_hash,
@@ -116,16 +116,16 @@ pub struct OnlineAccountResponse {
 )]
 #[get("/accounts/me")]
 pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<AccountResponse>> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let account = query!(db.as_ref(), Account)
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
 
     Ok(Json(AccountResponse {
-        uuid: Uuid::from_slice(&account.uuid).map_err(|_| ApiError::InternalServerError)?,
+        uuid: account.uuid,
         username: account.username,
         display_name: account.display_name,
     }))
@@ -148,10 +148,10 @@ pub async fn delete_me(
     session: Session,
     ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     rorm::delete!(db.as_ref(), Account)
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .await?;
 
     // Clear the current session
@@ -197,7 +197,7 @@ pub async fn set_password(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     if req.new_password.is_empty() {
         return Err(ApiError::InvalidPassword);
@@ -206,7 +206,7 @@ pub async fn set_password(
     let mut tx = db.start_transaction().await?;
 
     let (pw_hash,) = query!(&mut tx, (Account::F.password_hash,))
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
@@ -224,7 +224,7 @@ pub async fn set_password(
         .to_string();
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .set(Account::F.password_hash, &password_hash)
         .exec()
         .await?;
@@ -265,7 +265,7 @@ pub async fn update_me(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<HttpResponse> {
-    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
 
@@ -291,7 +291,7 @@ pub async fn update_me(
     }
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(&uuid))
+        .condition(Account::F.uuid.equals(uuid.as_ref()))
         .begin_dyn_set()
         .set_if(Account::F.username, req.username.as_ref())
         .set_if(Account::F.display_name, req.display_name.as_ref())
@@ -378,10 +378,7 @@ pub async fn lookup_account_by_username(
         .ok_or(ApiError::InvalidUsername)?;
 
     Ok(Json(AccountResponse {
-        uuid: Uuid::from_slice(&account.uuid).map_err(|err| {
-            error!("Retrieved invalid uuid from db: {err}");
-            ApiError::InternalServerError
-        })?,
+        uuid: account.uuid,
         username: account.username,
         display_name: account.display_name,
     }))

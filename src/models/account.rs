@@ -1,5 +1,6 @@
 use rorm::fields::BackRef;
 use rorm::{field, Model, Patch};
+use uuid::Uuid;
 
 use crate::models::ChatRoomMember;
 
@@ -10,7 +11,7 @@ pub struct Account {
     ///
     /// This will be a uuid.
     #[rorm(primary_key)]
-    pub uuid: Vec<u8>,
+    pub uuid: Uuid,
 
     /// The username of the client
     #[rorm(max_length = 255, unique)]
@@ -34,7 +35,7 @@ pub struct Account {
 #[derive(Patch)]
 #[rorm(model = "Account")]
 pub(crate) struct AccountInsert {
-    pub(crate) uuid: Vec<u8>,
+    pub(crate) uuid: Uuid,
     pub(crate) username: String,
     pub(crate) display_name: String,
     pub(crate) password_hash: String,

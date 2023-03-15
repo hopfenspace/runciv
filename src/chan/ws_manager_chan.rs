@@ -115,11 +115,11 @@ pub type WsManagerChan = Sender<WsManagerMessage>;
 /// Messages to control the websocket manager
 pub enum WsManagerMessage {
     /// Close the socket from the server side
-    CloseSocket(Vec<u8>),
+    CloseSocket(Uuid),
     /// Client with given uuid initialized a websocket
-    OpenedSocket(Vec<u8>, ws::Sender),
+    OpenedSocket(Uuid, ws::Sender),
     /// Send a message to given uuid
-    SendMessage(Vec<u8>, WsMessage),
+    SendMessage(Uuid, WsMessage),
     /// Retrieve the current websocket count by sending this
     /// message to the ws manager.
     ///
@@ -129,14 +129,14 @@ pub enum WsManagerMessage {
     /// message to the ws manager
     ///
     /// It will respond through the provided channel.
-    RetrieveOnlineState(Vec<Vec<u8>>, oneshot::Sender<Vec<bool>>),
+    RetrieveOnlineState(Vec<Uuid>, oneshot::Sender<Vec<bool>>),
 }
 
 /// Start the websocket manager
 ///
 /// It will return a channel to this manager
 pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
-    let mut lookup: HashMap<Vec<u8>, Vec<Sender<WsMessage>>> = HashMap::new();
+    let mut lookup: HashMap<Uuid, Vec<Sender<WsMessage>>> = HashMap::new();
 
     let (tx, mut rx) = mpsc::channel(16);
 
