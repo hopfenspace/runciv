@@ -1,15 +1,16 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json};
-use actix_web::{post, HttpResponse};
+use actix_web::{get, post, HttpResponse};
+use chrono::{DateTime, Utc};
 use log::error;
 use rorm::internal::field::foreign_model::ForeignModelByField;
 use rorm::{and, insert, query, Database, Model};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
-use crate::models::{Account, Friend, InviteInsert, Lobby, LobbyAccount};
+use crate::models::{Account, Friend, Invite, InviteInsert, Lobby, LobbyAccount};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 
 /// The request to invite a friend into a lobby
@@ -35,7 +36,7 @@ pub struct CreateInviteRequest {
     request_body = CreateInviteRequest,
     security(("session_cookie" = []))
 )]
-#[post("/invite")]
+#[post("/invites")]
 pub async fn create_invite(
     req: Json<CreateInviteRequest>,
     session: Session,
@@ -130,4 +131,75 @@ pub async fn create_invite(
     }
 
     Ok(HttpResponse::Ok().finish())
+}
+
+/// A single invite
+#[derive(Serialize, ToSchema)]
+pub struct GetInvite {
+    #[schema(example = 1337)]
+    id: u64,
+    created_at: DateTime<Utc>,
+    from: AccountResponse,
+    #[schema(example = 1337)]
+    lobby_id: u64,
+}
+
+/// The invites that an account has received
+#[derive(Serialize, ToSchema)]
+pub struct GetInvitesResponse {
+    invites: Vec<GetInvite>,
+}
+
+/// Retrieve all invites for the executing user
+#[utoipa::path(
+    tag = "Invites",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Retrieve all invites", body = GetInvitesResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    security(("session_cookie" = []))
+)]
+#[get("/invites")]
+pub async fn get_invites(
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<Json<GetInvitesResponse>> {
+    let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let invites = query!(
+        &db,
+        (
+            Invite::F.id,
+            Invite::F.from.f().uuid,
+            Invite::F.from.f().username,
+            Invite::F.from.f().display_name,
+            Invite::F.lobby.f().id,
+            Invite::F.created_at
+        )
+    )
+    .condition(Invite::F.to.equals(&uuid))
+    .all()
+    .await?;
+
+    Ok(Json(GetInvitesResponse {
+        invites: invites
+            .into_iter()
+            .map(
+                |(id, from_uuid, from_username, from_display_name, lobby_id, created_at)| {
+                    GetInvite {
+                        id: id as u64,
+                        lobby_id: lobby_id as u64,
+                        created_at: DateTime::from_utc(created_at, Utc),
+                        from: AccountResponse {
+                            uuid: Uuid::from_slice(&from_uuid).unwrap(),
+                            username: from_username,
+                            display_name: from_display_name,
+                        },
+                    }
+                },
+            )
+            .collect(),
+    }))
 }

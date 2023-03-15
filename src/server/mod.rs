@@ -25,9 +25,9 @@ use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
     accept_friend_request, create_friend_request, create_invite, create_lobby, delete_friend,
-    delete_me, get_all_chats, get_chat, get_friends, get_lobbies, get_me, health, login, logout,
-    lookup_account_by_username, lookup_account_by_uuid, register_account, set_password, update_me,
-    version, websocket, welcome_page,
+    delete_me, get_all_chats, get_chat, get_friends, get_invites, get_lobbies, get_me, health,
+    login, logout, lookup_account_by_username, lookup_account_by_uuid, register_account,
+    set_password, update_me, version, websocket, welcome_page,
 };
 use crate::server::middleware::{
     handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
@@ -126,7 +126,8 @@ pub async fn start_server(
                     .service(create_lobby)
                     .service(get_chat)
                     .service(get_all_chats)
-                    .service(create_invite),
+                    .service(create_invite)
+                    .service(get_invites),
             )
     })
     .bind(s_addr)?
