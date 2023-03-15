@@ -26,6 +26,7 @@ mod accounts;
 mod auth;
 mod chats;
 mod friends;
+mod games;
 mod health;
 mod invites;
 mod lobbies;

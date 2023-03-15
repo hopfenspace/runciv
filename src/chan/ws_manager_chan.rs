@@ -71,8 +71,8 @@ pub enum WsMessage {
         game_id: u64,
         /// Data of the game
         game_data: Box<RawValue>,
-        /// A unique counter that is incremented every time a [FinishedTurn] is received from
-        /// the same `game_id`.
+        /// A unique counter identifying a game state, which is changed every time a
+        /// [FinishedTurn] is received from the same `game_id`.
         ///
         /// This can be used by clients to check for updates on a long running game via API.
         game_data_id: u64,

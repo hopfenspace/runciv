@@ -9,5 +9,6 @@ pub use lobby::*;
 mod account;
 mod chat;
 mod friend;
+mod game;
 mod invite;
 mod lobby;
