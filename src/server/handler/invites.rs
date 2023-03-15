@@ -89,7 +89,7 @@ pub async fn create_invite(
     let invite_id = insert!(&mut tx, InviteInsert)
         .return_primary_key()
         .single(&InviteInsert {
-            from: ForeignModelByField::Key(uuid.clone()),
+            from: ForeignModelByField::Key(uuid),
             to: friend.to,
             lobby: ForeignModelByField::Key(lobby.id),
         })

@@ -123,7 +123,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     id: l.id as u64,
                     name: l.name,
                     owner: AccountResponse {
-                        uuid: owner.uuid.clone(),
+                        uuid: owner.uuid,
                         username: owner.username.clone(),
                         display_name: owner.display_name.clone(),
                     },
@@ -239,7 +239,7 @@ pub async fn create_lobby(
     insert!(&mut tx, ChatRoomMemberInsert)
         .single(&ChatRoomMemberInsert {
             chat_room: ForeignModelByField::Key(chat_room_id),
-            member: ForeignModelByField::Key(uuid.clone()),
+            member: ForeignModelByField::Key(uuid),
         })
         .await?;
 
