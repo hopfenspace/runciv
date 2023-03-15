@@ -12,7 +12,7 @@ repository = "https://github.com/hopfenspace/runciv"
 # Web framework
 actix-web = { version = "~4" }
 # Extensions for actix-web
-actix-toolbox = { version = "~0.9", features = ["logging", "ws", "session"], git = "https://github.com/gammelalf/actix-toolbox", branch = "rorm-update" }
+actix-toolbox = { version = "~0.10", features = ["logging", "ws", "session"] }
 
 # openapi swagger
 utoipa = { version = "~3", features = ["actix_extras", "repr", "chrono", "uuid", "openapi_extensions", "preserve_order"] }
@@ -47,7 +47,7 @@ uuid = { version = "~1", features = ["v4", "serde"] }
 base64 = { version = "~0.21" }
 
 # ORM
-rorm = { version = "~0.4", features = ["tokio-rustls", "cli"], git = "https://github.com/rorm-orm/rorm" }
+rorm = { version = "~0.5", features = ["tokio-rustls", "cli", "uuid"] }
 
 # Async runtime
 tokio = { version = ">=1.23.1", features = ["rt-multi-thread", "sync", "macros"] }

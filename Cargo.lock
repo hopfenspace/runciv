@@ -169,8 +169,9 @@ dependencies = [
 
 [[package]]
 name = "actix-toolbox"
-version = "0.9.0"
-source = "git+https://github.com/gammelalf/actix-toolbox?branch=rorm-update#8814488996fabe8078e742192e1b283ee7a2b315"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c28663c4880f5625c44565e089a00babe309ca382a92d3a4680cd50cac0b2d4"
 dependencies = [
  "actix",
  "actix-session",
@@ -1994,8 +1995,9 @@ dependencies = [
 
 [[package]]
 name = "rorm"
-version = "0.4.2"
-source = "git+https://github.com/rorm-orm/rorm#bb2c3f2f7f1956972702eca0672a5ad4c232d84e"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4f16d75070e30cdff2ba2c3bb5b13a804fb5b6959e60589e818c28c62a78e44"
 dependencies = [
  "chrono",
  "futures",
@@ -2004,10 +2006,11 @@ dependencies = [
  "pin-project",
  "rorm-cli",
  "rorm-db",
- "rorm-declaration 0.3.0 (git+https://github.com/rorm-orm/rorm)",
+ "rorm-declaration",
  "rorm-macro",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -2020,8 +2023,8 @@ dependencies = [
  "clap",
  "once_cell",
  "regex",
- "rorm-declaration 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rorm-sql 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rorm-declaration",
+ "rorm-sql",
  "rpassword",
  "serde",
  "serde_json",
@@ -2033,16 +2036,17 @@ dependencies = [
 
 [[package]]
 name = "rorm-db"
-version = "0.7.0"
-source = "git+https://github.com/rorm-orm/rorm#bb2c3f2f7f1956972702eca0672a5ad4c232d84e"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1764eba46f71546ed17e5e2afce845c3f9304b414849559f090b6ee83b1e9bf0"
 dependencies = [
  "aliasable",
  "futures",
  "log",
  "ouroboros",
  "pin-project",
- "rorm-declaration 0.3.0 (git+https://github.com/rorm-orm/rorm)",
- "rorm-sql 0.6.0 (git+https://github.com/rorm-orm/rorm)",
+ "rorm-declaration",
+ "rorm-sql",
  "serde",
  "sqlx",
 ]
@@ -2059,19 +2063,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rorm-declaration"
-version = "0.3.0"
-source = "git+https://github.com/rorm-orm/rorm#bb2c3f2f7f1956972702eca0672a5ad4c232d84e"
-dependencies = [
- "ordered-float 3.4.0",
- "serde",
- "strum",
-]
-
-[[package]]
 name = "rorm-macro"
-version = "0.5.0"
-source = "git+https://github.com/rorm-orm/rorm#bb2c3f2f7f1956972702eca0672a5ad4c232d84e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fca53686a59dd381b867c6403670ed75b2efdaf39d18bd7f8fba89a1ee0ec847"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2087,17 +2082,7 @@ checksum = "33fc02b79d31d3532e3a1ad123e93ea870331fc56f142967006355024a9247f1"
 dependencies = [
  "chrono",
  "libsqlite3-sys",
- "rorm-declaration 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "rorm-sql"
-version = "0.6.0"
-source = "git+https://github.com/rorm-orm/rorm#bb2c3f2f7f1956972702eca0672a5ad4c232d84e"
-dependencies = [
- "chrono",
- "libsqlite3-sys",
- "rorm-declaration 0.3.0 (git+https://github.com/rorm-orm/rorm)",
+ "rorm-declaration",
 ]
 
 [[package]]

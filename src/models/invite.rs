@@ -1,4 +1,5 @@
-use rorm::{ForeignModel, Model, Patch};
+use rorm::fields::ForeignModel;
+use rorm::{Model, Patch};
 
 use crate::models::{Account, Lobby};
 

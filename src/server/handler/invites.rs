@@ -3,7 +3,7 @@ use actix_web::web::{Data, Json};
 use actix_web::{get, post, HttpResponse};
 use chrono::{DateTime, Utc};
 use log::error;
-use rorm::internal::field::foreign_model::ForeignModelByField;
+use rorm::fields::ForeignModelByField;
 use rorm::{and, insert, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -48,22 +48,15 @@ pub async fn create_invite(
     let mut tx = db.start_transaction().await?;
 
     // Check if lobby is currently open
-    let lobby = query!(&db, Lobby)
-        .transaction(&mut tx)
+    let lobby = query!(&mut tx, Lobby)
         .condition(Lobby::F.id.equals(req.lobby_id as i64))
         .optional()
         .await?
         .ok_or(ApiError::InvalidLobbyId)?;
 
-    let is_owner = match lobby.owner {
-        ForeignModelByField::Key(k) => k == uuid,
-        ForeignModelByField::Instance(account) => account.uuid == uuid,
-    };
-
     // Check if the executing account has the privileges to invite to the specified lobby
-    if !is_owner
-        && query!(&db, LobbyAccount)
-            .transaction(&mut tx)
+    if *lobby.owner.key() != uuid
+        && query!(&mut tx, LobbyAccount)
             .condition(and!(
                 LobbyAccount::F.lobby.equals(lobby.id),
                 LobbyAccount::F.player.equals(&uuid)
@@ -76,16 +69,14 @@ pub async fn create_invite(
     }
 
     // Check if specified friend is valid
-    let friend_account = query!(&db, Account)
-        .transaction(&mut tx)
-        .condition(Account::F.uuid.equals(req.friend.as_bytes()))
+    let friend_account = query!(&mut tx, Account)
+        .condition(Account::F.uuid.equals(req.friend.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
 
     // Check if there's a valid friendship
-    let friend = query!(&db, Friend)
-        .transaction(&mut tx)
+    let friend = query!(&mut tx, Friend)
         .condition(and!(
             Friend::F.is_request.equals(false),
             Friend::F.from.equals(&uuid),
@@ -95,8 +86,8 @@ pub async fn create_invite(
         .await?
         .ok_or(ApiError::InvalidFriendState)?;
 
-    let invite_id = insert!(&db, InviteInsert)
-        .transaction(&mut tx)
+    let invite_id = insert!(&mut tx, InviteInsert)
+        .return_primary_key()
         .single(&InviteInsert {
             from: ForeignModelByField::Key(uuid.clone()),
             to: friend.to,
@@ -104,8 +95,7 @@ pub async fn create_invite(
         })
         .await?;
 
-    let executing_account = query!(&db, Account)
-        .transaction(&mut tx)
+    let executing_account = query!(&mut tx, Account)
         .condition(Account::F.uuid.equals(&uuid))
         .optional()
         .await?
@@ -169,13 +159,13 @@ pub async fn get_invites(
     let uuid: Vec<u8> = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let invites = query!(
-        &db,
+        db.as_ref(),
         (
             Invite::F.id,
-            Invite::F.from.f().uuid,
-            Invite::F.from.f().username,
-            Invite::F.from.f().display_name,
-            Invite::F.lobby.f().id,
+            Invite::F.from.uuid,
+            Invite::F.from.username,
+            Invite::F.from.display_name,
+            Invite::F.lobby.id,
             Invite::F.created_at
         )
     )
