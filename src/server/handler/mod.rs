@@ -16,6 +16,7 @@ pub use crate::server::handler::auth::*;
 pub use crate::server::handler::chats::*;
 pub use crate::server::handler::friends::*;
 pub use crate::server::handler::health::*;
+pub use crate::server::handler::invites::*;
 pub use crate::server::handler::lobbies::*;
 pub use crate::server::handler::version::*;
 pub use crate::server::handler::websocket::*;
@@ -26,6 +27,7 @@ mod auth;
 mod chats;
 mod friends;
 mod health;
+mod invites;
 mod lobbies;
 mod version;
 mod websocket;
@@ -61,6 +63,8 @@ pub(crate) enum ApiStatusCode {
     InvalidMaxPlayersCount = 1017,
     AlreadyInALobby = 1018,
     InvalidUuid = 1019,
+    InvalidLobbyId = 1020,
+    InvalidFriendId = 1021,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -134,6 +138,10 @@ pub enum ApiError {
     AlreadyInALobby,
     /// The provided uuid was not valid
     InvalidUuid,
+    /// An invalid lobby id was specified
+    InvalidLobbyId,
+    /// A friend in an invalid state was specified
+    InvalidFriendState,
 
     /// Unknown error occurred
     InternalServerError,
@@ -180,6 +188,8 @@ impl Display for ApiError {
             ApiError::InvalidMaxPlayersCount => write!(f, "Invalid max_players count"),
             ApiError::AlreadyInALobby => write!(f, "Already in a lobby"),
             ApiError::InvalidUuid => write!(f, "The provided uuid was not valid"),
+            ApiError::InvalidLobbyId => write!(f, "The provided lobby id was not valid"),
+            ApiError::InvalidFriendState => write!(f, "Invalid friend state"),
         }
     }
 }
@@ -354,6 +364,14 @@ impl actix_web::ResponseError for ApiError {
             }
             ApiError::InvalidUuid => HttpResponse::BadRequest().json(ApiErrorResponse::new(
                 ApiStatusCode::InvalidUuid,
+                self.to_string(),
+            )),
+            ApiError::InvalidLobbyId => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::InvalidLobbyId,
+                self.to_string(),
+            )),
+            ApiError::InvalidFriendState => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::InvalidFriendId,
                 self.to_string(),
             )),
         }
