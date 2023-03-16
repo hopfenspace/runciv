@@ -67,6 +67,7 @@ pub(crate) enum ApiStatusCode {
     InvalidUuid = 1019,
     InvalidLobbyId = 1020,
     InvalidFriendId = 1021,
+    GameNotFound = 1022,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -144,6 +145,8 @@ pub enum ApiError {
     InvalidLobbyId,
     /// A friend in an invalid state was specified
     InvalidFriendState,
+    /// The requested game state could not be found on the server
+    GameNotFound,
 
     /// Unknown error occurred
     InternalServerError,
@@ -192,6 +195,7 @@ impl Display for ApiError {
             ApiError::InvalidUuid => write!(f, "The provided uuid was not valid"),
             ApiError::InvalidLobbyId => write!(f, "The provided lobby id was not valid"),
             ApiError::InvalidFriendState => write!(f, "Invalid friend state"),
+            ApiError::GameNotFound => write!(f, "The game was not found on the server"),
         }
     }
 }
@@ -374,6 +378,10 @@ impl actix_web::ResponseError for ApiError {
             )),
             ApiError::InvalidFriendState => HttpResponse::BadRequest().json(ApiErrorResponse::new(
                 ApiStatusCode::InvalidFriendId,
+                self.to_string(),
+            )),
+            ApiError::GameNotFound => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::GameNotFound,
                 self.to_string(),
             )),
         }

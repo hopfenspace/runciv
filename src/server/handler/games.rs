@@ -2,18 +2,14 @@ use actix_toolbox::tb_middleware::Session;
 use actix_web::get;
 use actix_web::web::{Data, Json, Path};
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
-use rorm::fields::ForeignModelByField;
-use rorm::{and, insert, query, Database, Model};
+use log::{debug, error};
+use rorm::{and, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::config::Config;
-use crate::models::{
-    Account, ChatRoom, ChatRoomInsert, Game, GameAccount, GameAccountInsert, GameInsert,
-};
-use crate::server::handler::{AccountResponse, ApiError, ApiErrorResponse, ApiResult};
+use crate::models::Game;
+use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 use crate::server::RuntimeSettings;
 
 /// A single game state identified by its ID and state identifier
@@ -28,7 +24,7 @@ pub struct GameStateResponse {
     game_data_id: u64,
     #[schema(example = "Herbert's game")]
     name: String,
-    max_player: i16,
+    max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
     #[schema(example = 1337)]
@@ -48,7 +44,7 @@ pub struct GameOverviewResponse {
     game_data_id: u64,
     #[schema(example = "Herbert's game")]
     name: String,
-    max_player: i16,
+    max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
     #[schema(example = 1337)]
@@ -76,7 +72,6 @@ pub struct GetGameOverviewResponse {
 )]
 #[get("/games")]
 pub async fn get_open_games(
-    settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GetGameOverviewResponse>> {
@@ -157,21 +152,70 @@ pub struct GameId {
 #[get("/games/{id}")]
 pub async fn get_game(
     path: Path<GameId>,
+    settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GameStateResponse>> {
-    // TODO: Implement this endpoint
-    Ok(Json(GameStateResponse {
-        game_data: "".to_string(),
-        game_data_id: 0,
-        name: "".to_string(),
-        max_players: 0,
-        last_activity: Default::default(),
-        last_player: AccountResponse {
-            uuid: Default::default(),
-            username: "".to_string(),
-            display_name: "".to_string(),
-        },
-        chat_room_id: 0,
-    }))
+    let game_id = path.id;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    return match query!(
+        db.as_ref(),
+        (
+            Game::F.data_id,
+            Game::F.name,
+            Game::F.max_players,
+            Game::F.updated_at,
+            Game::F.updated_by.uuid,
+            Game::F.updated_by.username,
+            Game::F.updated_by.display_name,
+            Game::F.chat_room,
+        )
+    )
+    .condition(and!(
+        Game::F.id.equals(game_id as i64),
+        Game::F.current_players.player.uuid.equals(uuid.as_ref())
+    ))
+    .optional()
+    .await?
+    {
+        None => {
+            debug!("Game not found since no database entry exists for the given search parameters");
+            Err(ApiError::GameNotFound)
+        }
+        Some((
+            data_id,
+            name,
+            max_players,
+            updated_at,
+            updated_by_uuid,
+            updated_by_username,
+            updated_by_display_name,
+            chat_room,
+        )) => {
+            let filename = format!("game_{game_id}_{data_id}.txt");
+            let path = std::path::Path::new(&settings.game_data_storage).join(filename);
+            let content = match tokio::fs::read_to_string(&path).await {
+                Ok(s) => s,
+                Err(e) => {
+                    let printable_path = path.display();
+                    error!("Game data expected in '{printable_path}' couldn't be read: {e}");
+                    return Err(ApiError::GameNotFound);
+                }
+            };
+            Ok(Json(GameStateResponse {
+                game_data: content,
+                game_data_id: data_id as u64,
+                name,
+                max_players,
+                last_activity: DateTime::from_utc(updated_at, Utc),
+                last_player: AccountResponse {
+                    uuid: updated_by_uuid,
+                    username: updated_by_username.to_string(),
+                    display_name: updated_by_display_name.to_string(),
+                },
+                chat_room_id: *chat_room.key() as u64,
+            }))
+        }
+    };
 }

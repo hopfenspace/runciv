@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct ServerConfig {
+    /// The directory on the local filesystem where to store game data files
+    pub game_data_storage: String,
     /// The address the server should bind to
     pub listen_address: IpAddr,
     /// The port the server should bind to

@@ -7,7 +7,7 @@ use crate::models::{Account, ChatRoom};
 ///
 /// The game data itself should be stored in a file on disk,
 /// use `id` and `data_id` to create a filename to store it.
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct Game {
     /// Primary key of the game
     #[rorm(id)]
@@ -25,7 +25,7 @@ pub struct Game {
     pub current_players: BackRef<field!(GameAccount::F.game)>,
 
     /// The maximum count of players
-    pub max_player: i16,
+    pub max_players: i16,
 
     /// The point in time, the game was updated
     #[rorm(auto_create_time, auto_update_time)]
@@ -44,13 +44,13 @@ pub struct Game {
 #[rorm(model = "Game")]
 pub(crate) struct GameInsert {
     pub(crate) name: String,
-    pub(crate) max_player: i16,
+    pub(crate) max_players: i16,
     pub(crate) updated_by: ForeignModel<Account>,
     pub(crate) chat_room: ForeignModel<ChatRoom>,
 }
 
 /// The m2m relation between games and accounts
-#[derive(Model, Debug)]
+#[derive(Model)]
 pub struct GameAccount {
     /// Primary key of a game account
     #[rorm(id)]

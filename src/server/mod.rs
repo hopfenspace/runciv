@@ -1,6 +1,5 @@
 //! This module holds the server definition
 
-use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use actix_toolbox::tb_middleware::{
@@ -16,7 +15,6 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use log::info;
 use rorm::Database;
-use tokio::sync::Mutex;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
@@ -39,10 +37,12 @@ pub mod handler;
 pub mod middleware;
 pub mod swagger;
 
-/// This type holds the file data of the game.
-///
-/// In the original implementation this was written to disk
-pub type FileData = Data<Mutex<HashMap<String, Vec<u8>>>>;
+/// Collection of settings and configs used by endpoint implementations during runtime
+#[derive(Clone, Debug)]
+pub struct RuntimeSettings {
+    /// The directory on the local filesystem where to store game data files
+    pub game_data_storage: String,
+}
 
 /// Start the runciv server
 ///
@@ -64,18 +64,20 @@ pub async fn start_server(
     let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
     info!("Starting to listen on {}", s_addr);
 
-    let file_data: FileData = Data::new(Mutex::new(HashMap::new()));
     let admin_token = config.server.admin_token.clone();
-
     if admin_token.is_empty() {
         return Err(StartServerError::InvalidSecretKey);
     }
+
+    let runtime_settings = RuntimeSettings {
+        game_data_storage: config.server.game_data_storage.clone(),
+    };
 
     HttpServer::new(move || {
         App::new()
             .app_data(PayloadConfig::default())
             .app_data(JsonConfig::default().error_handler(json_extractor_error))
-            .app_data(file_data.clone())
+            .app_data(Data::new(runtime_settings.clone()))
             .app_data(Data::new(db.clone()))
             .app_data(Data::new(ws_manager_chan.clone()))
             .wrap(setup_logging_mw(LoggingMiddlewareConfig::default()))
