@@ -15,6 +15,7 @@ pub use crate::server::handler::accounts::*;
 pub use crate::server::handler::auth::*;
 pub use crate::server::handler::chats::*;
 pub use crate::server::handler::friends::*;
+pub use crate::server::handler::games::*;
 pub use crate::server::handler::health::*;
 pub use crate::server::handler::invites::*;
 pub use crate::server::handler::lobbies::*;

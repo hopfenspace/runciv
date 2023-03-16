@@ -1,4 +1,5 @@
-use rorm::{BackRef, ForeignModel, Model, Patch};
+use rorm::fields::{BackRef, ForeignModel};
+use rorm::{field, Model, Patch};
 
 use crate::models::{Account, ChatRoom};
 
@@ -21,14 +22,13 @@ pub struct Game {
     pub name: String,
 
     /// The users that are currently playing this game
-    #[rorm(field = "GameAccount::F.game")]
-    pub current_players: BackRef<GameAccount>,
+    pub current_players: BackRef<field!(GameAccount::F.game)>,
 
     /// The maximum count of players
     pub max_player: i16,
 
     /// The point in time, the game was updated
-    #[rorm(auto_update_time)]
+    #[rorm(auto_create_time, auto_update_time)]
     pub updated_at: chrono::NaiveDateTime,
 
     /// The player who uploaded the most recent game state
@@ -45,6 +45,7 @@ pub struct Game {
 pub(crate) struct GameInsert {
     pub(crate) name: String,
     pub(crate) max_player: i16,
+    pub(crate) updated_by: ForeignModel<Account>,
     pub(crate) chat_room: ForeignModel<ChatRoom>,
 }
 
