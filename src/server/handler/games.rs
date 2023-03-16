@@ -1,9 +1,9 @@
 use actix_toolbox::tb_middleware::Session;
-use actix_web::get;
 use actix_web::web::{Data, Json, Path};
+use actix_web::{get, put};
 use chrono::{DateTime, Utc};
-use log::{debug, error};
-use rorm::{and, query, Database, Model};
+use log::{debug, error, warn};
+use rorm::{and, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -137,7 +137,7 @@ pub struct GameId {
 /// Retrieves a single game which is currently open (actively played)
 ///
 /// If the game has been completed or aborted, it
-/// will respond with a `NotFound` in `ApiErrorResponse`.
+/// will respond with a `GameNotFound` in `ApiErrorResponse`.
 #[utoipa::path(
     tag = "Games",
     context_path = "/api/v2",
@@ -218,4 +218,97 @@ pub async fn get_game(
             }))
         }
     };
+}
+
+/// The response a user receives after uploading a new game state successfully
+#[derive(Serialize, ToSchema)]
+pub struct GameUploadResponse {
+    #[schema(example = 1337)]
+    game_data_id: u64,
+}
+
+/// The request a user sends to the server to upload a new game state
+#[derive(Deserialize, ToSchema)]
+pub struct GameUploadRequest {
+    #[schema(example = 1337)]
+    game_id: u64,
+    game_data: String,
+}
+
+/// Upload a new game state for an existing game
+///
+/// If the game can't be updated (maybe it has been already completed or
+/// aborted), it will respond with a `GameNotFound` in `ApiErrorResponse`.
+#[utoipa::path(
+    tag = "Games",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns the new data identifier of the uploaded game state", body = GameUploadResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    request_body = GameUploadRequest,
+    security(("session_cookie" = []))
+)]
+#[put("/games")]
+pub async fn push_game_update(
+    req: Json<GameUploadRequest>,
+    settings: Data<RuntimeSettings>,
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<Json<GameUploadResponse>> {
+    let game_id = req.game_id as i64;
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    // Lookup the game and verify that the player is actually participating in it
+    let old_data_id = match query!(db.as_ref(), (Game::F.data_id,))
+        .condition(and!(
+            Game::F.id.equals(game_id),
+            Game::F.current_players.player.uuid.equals(uuid.as_ref())
+        ))
+        .optional()
+        .await?
+    {
+        None => return Err(ApiError::GameNotFound),
+        Some((data_id,)) => data_id,
+    };
+
+    // Increment the data identifier used to determine whether a game state has changed
+    let new_data_id = old_data_id + 1;
+
+    // Save a new file with the updated game state to disk
+    let new_filename = format!("game_{game_id}_{new_data_id}.txt");
+    let new_path = std::path::Path::new(&settings.game_data_storage).join(new_filename);
+    match tokio::fs::write(&new_path, &req.game_data).await {
+        Err(e) => {
+            let printable_path = &new_path.display();
+            error!("Game data could not be saved to '{printable_path}': {e}");
+            return Err(ApiError::InternalServerError);
+        }
+        _ => (),
+    }
+
+    // Update the game state identifier and last player in the database,
+    // which also updates the last access time automatically
+    let updated_by = uuid.to_bytes_le();
+    update!(db.as_ref(), Game)
+        .set(Game::F.data_id, new_data_id)
+        .set(Game::F.updated_by, updated_by.as_ref())
+        .condition(Game::F.id.equals(game_id))
+        .await?;
+
+    // Remove the old file from the filesystem
+    let old_filename = format!("game_{game_id}_{old_data_id}.txt");
+    let old_path = std::path::Path::new(&settings.game_data_storage).join(old_filename);
+    match tokio::fs::remove_file(&old_path).await {
+        Err(e) => {
+            let printable_path = &old_path.display();
+            warn!("Outdated data in '{printable_path}' could not be removed and may leak: {e}");
+        }
+        _ => (),
+    }
+
+    Ok(Json(GameUploadResponse {
+        game_data_id: new_data_id as u64,
+    }))
 }

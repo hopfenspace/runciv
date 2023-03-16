@@ -146,6 +146,7 @@ pub enum ApiError {
     /// A friend in an invalid state was specified
     InvalidFriendState,
     /// The requested game state could not be found on the server
+    /// or the user doesn't have the permission to see it
     GameNotFound,
 
     /// Unknown error occurred

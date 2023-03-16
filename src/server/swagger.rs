@@ -45,6 +45,7 @@ impl Modify for CookieSecurity {
         handler::get_invites,
         handler::get_open_games,
         handler::get_game,
+        handler::push_game_update,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -75,6 +76,8 @@ impl Modify for CookieSecurity {
         handler::GameStateResponse,
         handler::GameOverviewResponse,
         handler::GetGameOverviewResponse,
+        handler::GameUploadResponse,
+        handler::GameUploadRequest,
     )),
     modifiers(&CookieSecurity)
 )]
