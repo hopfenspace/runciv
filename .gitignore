@@ -4,3 +4,4 @@
 target/
 config.toml
 log/
+storage/

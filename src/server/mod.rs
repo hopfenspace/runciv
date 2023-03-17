@@ -41,7 +41,7 @@ pub mod swagger;
 #[derive(Clone, Debug)]
 pub struct RuntimeSettings {
     /// The directory on the local filesystem where to store game data files
-    pub game_data_storage: String,
+    pub game_data_path: String,
 }
 
 /// Start the runciv server
@@ -70,7 +70,7 @@ pub async fn start_server(
     }
 
     let runtime_settings = RuntimeSettings {
-        game_data_storage: config.server.game_data_storage.clone(),
+        game_data_path: config.server.game_data_path.clone(),
     };
 
     HttpServer::new(move || {

@@ -1,3 +1,5 @@
+use std::path::Path as StdPath;
+
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{get, put};
@@ -5,6 +7,7 @@ use chrono::{DateTime, Utc};
 use log::{debug, error, warn};
 use rorm::{and, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
+use tokio::fs::{read_to_string, remove_file, write};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
@@ -24,6 +27,7 @@ pub struct GameStateResponse {
     game_data_id: u64,
     #[schema(example = "Herbert's game")]
     name: String,
+    #[schema(example = 7)]
     max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
@@ -44,6 +48,7 @@ pub struct GameOverviewResponse {
     game_data_id: u64,
     #[schema(example = "Herbert's game")]
     name: String,
+    #[schema(example = 7)]
     max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
@@ -59,7 +64,11 @@ pub struct GetGameOverviewResponse {
 
 /// Retrieves an overview of all open games of a player
 ///
-/// The response does not contain any full game state.
+/// The response does not contain any full game state, but rather
+/// a shortened game state identified by its ID and state identifier.
+/// If the state (`game_data_id`) of a known game differs from the last known
+/// identifier, the server has a newer state of the game. The `last_activity`
+/// field is a convenience attribute and shouldn't be used for update checks.
 #[utoipa::path(
     tag = "Games",
     context_path = "/api/v2",
@@ -159,7 +168,16 @@ pub async fn get_game(
     let game_id = path.id;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
-    return match query!(
+    let (
+        data_id,
+        name,
+        max_players,
+        updated_at,
+        updated_by_uuid,
+        updated_by_username,
+        updated_by_display_name,
+        chat_room,
+    ) = query!(
         db.as_ref(),
         (
             Game::F.data_id,
@@ -178,46 +196,30 @@ pub async fn get_game(
     ))
     .optional()
     .await?
-    {
-        None => {
-            debug!("Game not found since no database entry exists for the given search parameters");
-            Err(ApiError::GameNotFound)
-        }
-        Some((
-            data_id,
-            name,
-            max_players,
-            updated_at,
-            updated_by_uuid,
-            updated_by_username,
-            updated_by_display_name,
-            chat_room,
-        )) => {
-            let filename = format!("game_{game_id}_{data_id}.txt");
-            let path = std::path::Path::new(&settings.game_data_storage).join(filename);
-            let content = match tokio::fs::read_to_string(&path).await {
-                Ok(s) => s,
-                Err(e) => {
-                    let printable_path = path.display();
-                    error!("Game data expected in '{printable_path}' couldn't be read: {e}");
-                    return Err(ApiError::GameNotFound);
-                }
-            };
-            Ok(Json(GameStateResponse {
-                game_data: content,
-                game_data_id: data_id as u64,
-                name,
-                max_players,
-                last_activity: DateTime::from_utc(updated_at, Utc),
-                last_player: AccountResponse {
-                    uuid: updated_by_uuid,
-                    username: updated_by_username.to_string(),
-                    display_name: updated_by_display_name.to_string(),
-                },
-                chat_room_id: *chat_room.key() as u64,
-            }))
-        }
-    };
+    .ok_or({
+        debug!("Game not found since no database entry exists for the given search parameters");
+        ApiError::GameNotFound
+    })?;
+
+    let filename = format!("game_{game_id}_{data_id}.txt");
+    let path = StdPath::new(&settings.game_data_path).join(&filename);
+    let content = read_to_string(&path).await.map_err(|e| {
+        error!("Game data expected in '{filename}' couldn't be read: {e}");
+        ApiError::InternalServerError
+    })?;
+    Ok(Json(GameStateResponse {
+        game_data: content,
+        game_data_id: data_id as u64,
+        name,
+        max_players,
+        last_activity: DateTime::from_utc(updated_at, Utc),
+        last_player: AccountResponse {
+            uuid: updated_by_uuid,
+            username: updated_by_username.to_string(),
+            display_name: updated_by_display_name.to_string(),
+        },
+        chat_room_id: *chat_room.key() as u64,
+    }))
 }
 
 /// The response a user receives after uploading a new game state successfully
@@ -261,27 +263,23 @@ pub async fn push_game_update(
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     // Lookup the game and verify that the player is actually participating in it
-    let old_data_id = match query!(db.as_ref(), (Game::F.data_id,))
+    let (old_data_id,) = query!(db.as_ref(), (Game::F.data_id,))
         .condition(and!(
             Game::F.id.equals(game_id),
             Game::F.current_players.player.uuid.equals(uuid.as_ref())
         ))
         .optional()
         .await?
-    {
-        None => return Err(ApiError::GameNotFound),
-        Some((data_id,)) => data_id,
-    };
+        .ok_or(ApiError::GameNotFound)?;
 
     // Increment the data identifier used to determine whether a game state has changed
     let new_data_id = old_data_id + 1;
 
     // Save a new file with the updated game state to disk
     let new_filename = format!("game_{game_id}_{new_data_id}.txt");
-    let new_path = std::path::Path::new(&settings.game_data_storage).join(new_filename);
-    if let Err(e) = tokio::fs::write(&new_path, &req.game_data).await {
-        let printable_path = &new_path.display();
-        error!("Game data could not be saved to '{printable_path}': {e}");
+    let new_path = StdPath::new(&settings.game_data_path).join(&new_filename);
+    if let Err(e) = write(&new_path, &req.game_data).await {
+        error!("Game data could not be saved to '{new_filename}': {e}");
         return Err(ApiError::InternalServerError);
     }
 
@@ -296,10 +294,9 @@ pub async fn push_game_update(
 
     // Remove the old file from the filesystem
     let old_filename = format!("game_{game_id}_{old_data_id}.txt");
-    let old_path = std::path::Path::new(&settings.game_data_storage).join(old_filename);
-    if let Err(e) = tokio::fs::remove_file(&old_path).await {
-        let printable_path = &old_path.display();
-        warn!("Outdated data in '{printable_path}' could not be removed and may leak: {e}");
+    let old_path = StdPath::new(&settings.game_data_path).join(&old_filename);
+    if let Err(e) = remove_file(&old_path).await {
+        warn!("Outdated data in '{old_filename}' could not be removed and may leak: {e}");
     }
 
     Ok(Json(GameUploadResponse {
