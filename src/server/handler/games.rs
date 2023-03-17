@@ -115,8 +115,8 @@ pub async fn get_open_games(
                 last_activity: DateTime::from_utc(updated_at, Utc),
                 last_player: AccountResponse {
                     uuid: updated_by_uuid,
-                    username: updated_by_username.to_string(),
-                    display_name: updated_by_display_name.to_string(),
+                    username: updated_by_username,
+                    display_name: updated_by_display_name,
                 },
                 chat_room_id: *chat_room.key() as u64,
             }
@@ -279,13 +279,10 @@ pub async fn push_game_update(
     // Save a new file with the updated game state to disk
     let new_filename = format!("game_{game_id}_{new_data_id}.txt");
     let new_path = std::path::Path::new(&settings.game_data_storage).join(new_filename);
-    match tokio::fs::write(&new_path, &req.game_data).await {
-        Err(e) => {
-            let printable_path = &new_path.display();
-            error!("Game data could not be saved to '{printable_path}': {e}");
-            return Err(ApiError::InternalServerError);
-        }
-        _ => (),
+    if let Err(e) = tokio::fs::write(&new_path, &req.game_data).await {
+        let printable_path = &new_path.display();
+        error!("Game data could not be saved to '{printable_path}': {e}");
+        return Err(ApiError::InternalServerError);
     }
 
     // Update the game state identifier and last player in the database,
@@ -300,12 +297,9 @@ pub async fn push_game_update(
     // Remove the old file from the filesystem
     let old_filename = format!("game_{game_id}_{old_data_id}.txt");
     let old_path = std::path::Path::new(&settings.game_data_storage).join(old_filename);
-    match tokio::fs::remove_file(&old_path).await {
-        Err(e) => {
-            let printable_path = &old_path.display();
-            warn!("Outdated data in '{printable_path}' could not be removed and may leak: {e}");
-        }
-        _ => (),
+    if let Err(e) = tokio::fs::remove_file(&old_path).await {
+        let printable_path = &old_path.display();
+        warn!("Outdated data in '{printable_path}' could not be removed and may leak: {e}");
     }
 
     Ok(Json(GameUploadResponse {

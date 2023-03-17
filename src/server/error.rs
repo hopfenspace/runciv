@@ -22,7 +22,7 @@ impl Display for StartServerError {
             StartServerError::IO(err) => write!(f, "{err}"),
             StartServerError::InvalidSecretKey => write!(
                 f,
-                "Invalid parameter SecretKey.\
+                "Invalid parameter SecretKey. \
                     Consider using the subcommand keygen and update your configuration file"
             ),
             StartServerError::InvalidAdminToken => write!(f, "Invalid admin token was specified"),
