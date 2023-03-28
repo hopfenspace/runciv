@@ -8,11 +8,11 @@ use log::{debug, error, warn};
 use rorm::{and, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::fs::{read_to_string, remove_file, write};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::models::Game;
-use crate::server::handler::{AccountResponse, ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 use crate::server::RuntimeSettings;
 
 /// A single game state identified by its Uuid and state identifier
@@ -133,12 +133,6 @@ pub async fn get_open_games(
     Ok(Json(GetGameOverviewResponse { games: open_games }))
 }
 
-/// The Uuid of a game
-#[derive(Deserialize, IntoParams)]
-pub struct GameUuid {
-    uuid: Uuid,
-}
-
 /// Retrieves a single game which is currently open (actively played)
 ///
 /// If the game has been completed or aborted, it
@@ -151,12 +145,12 @@ pub struct GameUuid {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    params(GameUuid),
+    params(PathUuid),
     security(("session_cookie" = []))
 )]
 #[get("/games/{uuid}")]
 pub async fn get_game(
-    path: Path<GameUuid>,
+    path: Path<PathUuid>,
     settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
@@ -228,7 +222,6 @@ pub struct GameUploadResponse {
 /// The request a user sends to the server to upload a new game state
 #[derive(Deserialize, ToSchema)]
 pub struct GameUploadRequest {
-    game_uuid: Uuid,
     game_data: String,
 }
 
@@ -244,17 +237,19 @@ pub struct GameUploadRequest {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
+    params(PathUuid),
     request_body = GameUploadRequest,
     security(("session_cookie" = []))
 )]
-#[put("/games")]
+#[put("/games/{uuid}")]
 pub async fn push_game_update(
+    path: Path<PathUuid>,
     req: Json<GameUploadRequest>,
     settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GameUploadResponse>> {
-    let game_uuid = req.game_uuid;
+    let game_uuid = path.uuid;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     // Lookup the game and verify that the player is actually participating in it
