@@ -273,7 +273,7 @@ pub async fn create_friend_request(
         .condition(Account::F.uuid.equals(req.uuid.as_bytes().as_slice()))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidUsername)?;
+        .ok_or(ApiError::InvalidUuid)?;
 
     // Check if users are already in a friendship
     if let Some(friendship) = query!(&mut tx, Friend)
