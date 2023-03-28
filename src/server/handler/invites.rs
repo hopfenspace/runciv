@@ -16,7 +16,7 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 /// The request to invite a friend into a lobby
 #[derive(Deserialize, ToSchema)]
 pub struct CreateInviteRequest {
-    friend: Uuid,
+    friend_uuid: Uuid,
     lobby_uuid: Uuid,
 }
 
@@ -69,7 +69,7 @@ pub async fn create_invite(
 
     // Check if specified friend is valid
     let friend_account = query!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(req.friend.as_ref()))
+        .condition(Account::F.uuid.equals(req.friend_uuid.as_ref()))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
