@@ -95,12 +95,12 @@ pub struct AccountResponse {
 /// The account data
 #[derive(Serialize, ToSchema)]
 pub struct OnlineAccountResponse {
-    pub(crate) online: bool,
     pub(crate) uuid: Uuid,
     #[schema(example = "user123")]
     pub(crate) username: String,
     #[schema(example = "Herbert")]
     pub(crate) display_name: String,
+    pub(crate) online: bool,
 }
 
 /// Returns the account that is currently logged-in

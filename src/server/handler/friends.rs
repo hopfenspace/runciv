@@ -20,8 +20,7 @@ use crate::server::handler::{
 pub struct FriendResponse {
     uuid: Uuid,
     chat_uuid: Uuid,
-    from: AccountResponse,
-    to: OnlineAccountResponse,
+    friend: OnlineAccountResponse,
 }
 
 /// A single friend request
@@ -46,7 +45,6 @@ pub struct GetFriendResponse {
 ///
 /// `friends` is a list of already established friendships
 /// `friend_requests` is a list of friend requests (ingoing and outgoing)
-///
 ///
 /// Regarding `friend_requests`:
 ///
@@ -80,9 +78,6 @@ pub async fn get_friends(
         &mut tx,
         (
             Friend::F.uuid,
-            Friend::F.from.uuid,
-            Friend::F.from.username,
-            Friend::F.from.display_name,
             Friend::F.to.uuid,
             Friend::F.to.username,
             Friend::F.to.display_name,
@@ -100,7 +95,7 @@ pub async fn get_friends(
     let online_state = tokio::spawn(async move { oneshot_rx.await });
     if let Err(err) = ws_manager_chan
         .send(WsManagerMessage::RetrieveOnlineState(
-            friends_raw.iter().map(|raw| raw.4).collect(),
+            friends_raw.iter().map(|raw| raw.1).collect(),
             oneshot_tx,
         ))
         .await
@@ -125,27 +120,10 @@ pub async fn get_friends(
 
     // Retrieve all friendships
     let friends = Vec::from_iter(friends_raw.into_iter().zip(online_state).map(
-        |(
-            (
-                uuid,
-                from_uuid,
-                from_username,
-                from_display_name,
-                to_uuid,
-                to_username,
-                to_display_name,
-                chat_room,
-            ),
-            online,
-        )| FriendResponse {
+        |((uuid, to_uuid, to_username, to_display_name, chat_room), online)| FriendResponse {
             uuid,
             chat_uuid: *chat_room.key(),
-            from: AccountResponse {
-                uuid: from_uuid,
-                username: from_username,
-                display_name: from_display_name,
-            },
-            to: OnlineAccountResponse {
+            friend: OnlineAccountResponse {
                 uuid: to_uuid,
                 username: to_username,
                 display_name: to_display_name,
