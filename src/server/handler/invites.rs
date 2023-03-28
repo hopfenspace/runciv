@@ -17,8 +17,7 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 #[derive(Deserialize, ToSchema)]
 pub struct CreateInviteRequest {
     friend: Uuid,
-    #[schema(example = 1337)]
-    lobby_id: u64,
+    lobby_uuid: Uuid,
 }
 
 /// Invite a friend to a lobby.
@@ -49,16 +48,16 @@ pub async fn create_invite(
 
     // Check if lobby is currently open
     let lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.id.equals(req.lobby_id as i64))
+        .condition(Lobby::F.uuid.equals(req.lobby_uuid.as_ref()))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidLobbyId)?;
+        .ok_or(ApiError::InvalidLobbyUuid)?;
 
     // Check if the executing account has the privileges to invite to the specified lobby
     if *lobby.owner.key() != uuid
         && query!(&mut tx, LobbyAccount)
             .condition(and!(
-                LobbyAccount::F.lobby.equals(lobby.id),
+                LobbyAccount::F.lobby.equals(lobby.uuid.as_ref()),
                 LobbyAccount::F.player.equals(uuid.as_ref())
             ))
             .optional()
@@ -86,12 +85,13 @@ pub async fn create_invite(
         .await?
         .ok_or(ApiError::InvalidFriendState)?;
 
-    let invite_id = insert!(&mut tx, InviteInsert)
+    let invite_uuid = insert!(&mut tx, InviteInsert)
         .return_primary_key()
         .single(&InviteInsert {
+            uuid: Uuid::new_v4(),
             from: ForeignModelByField::Key(uuid),
             to: friend.to,
-            lobby: ForeignModelByField::Key(lobby.id),
+            lobby: ForeignModelByField::Key(lobby.uuid),
         })
         .await?;
 
@@ -104,8 +104,8 @@ pub async fn create_invite(
     tx.commit().await?;
 
     let invite = WsMessage::IncomingInvite {
-        invite_id: invite_id as u64,
-        lobby_id: lobby.id as u64,
+        invite_uuid,
+        lobby_uuid: lobby.uuid,
         from: AccountResponse {
             uuid: executing_account.uuid,
             username: executing_account.username,
@@ -126,12 +126,10 @@ pub async fn create_invite(
 /// A single invite
 #[derive(Serialize, ToSchema)]
 pub struct GetInvite {
-    #[schema(example = 1337)]
-    id: u64,
+    uuid: Uuid,
     created_at: DateTime<Utc>,
     from: AccountResponse,
-    #[schema(example = 1337)]
-    lobby_id: u64,
+    lobby_uuid: Uuid,
 }
 
 /// The invites that an account has received
@@ -161,11 +159,11 @@ pub async fn get_invites(
     let invites = query!(
         db.as_ref(),
         (
-            Invite::F.id,
+            Invite::F.uuid,
             Invite::F.from.uuid,
             Invite::F.from.username,
             Invite::F.from.display_name,
-            Invite::F.lobby.id,
+            Invite::F.lobby.uuid,
             Invite::F.created_at
         )
     )
@@ -177,10 +175,10 @@ pub async fn get_invites(
         invites: invites
             .into_iter()
             .map(
-                |(id, from_uuid, from_username, from_display_name, lobby_id, created_at)| {
+                |(uuid, from_uuid, from_username, from_display_name, lobby_uuid, created_at)| {
                     GetInvite {
-                        id: id as u64,
-                        lobby_id: lobby_id as u64,
+                        uuid,
+                        lobby_uuid,
                         created_at: DateTime::from_utc(created_at, Utc),
                         from: AccountResponse {
                             uuid: from_uuid,

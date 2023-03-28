@@ -88,8 +88,11 @@ pub async fn websocket(
                         };
 
                         match message {
-                            WsMessage::FinishedTurn { game_id, game_data } => {
-                                debug!("Received Finished turn: {game_id}");
+                            WsMessage::FinishedTurn {
+                                game_uuid,
+                                game_data,
+                            } => {
+                                debug!("Received Finished turn: {game_uuid}: {game_data}");
                             }
                             _ => invalid_msg!(rx_tx),
                         }

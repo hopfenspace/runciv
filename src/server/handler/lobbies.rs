@@ -19,8 +19,7 @@ use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 /// A single lobby
 #[derive(Serialize, ToSchema)]
 pub struct LobbyResponse {
-    #[schema(example = 1337)]
-    id: u64,
+    uuid: Uuid,
     #[schema(example = "Herbert's lobby")]
     name: String,
     #[schema(example = 4)]
@@ -30,8 +29,7 @@ pub struct LobbyResponse {
     created_at: DateTime<Utc>,
     password: bool,
     owner: AccountResponse,
-    #[schema(example = 1337)]
-    chat_room_id: u64,
+    chat_room_uuid: Uuid,
 }
 
 /// The lobbies that are open
@@ -60,7 +58,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
     let lobbies = query!(
         &mut tx,
         (
-            Lobby::F.id,
+            Lobby::F.uuid,
             Lobby::F.owner.uuid,
             Lobby::F.owner.username,
             Lobby::F.owner.display_name,
@@ -68,7 +66,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
             Lobby::F.created_at,
             Lobby::F.max_player,
             Lobby::F.password_hash,
-            Lobby::F.chat_room.id,
+            Lobby::F.chat_room.uuid,
         )
     )
     .all()
@@ -78,7 +76,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
         .into_iter()
         .map(
             |(
-                id,
+                uuid,
                 o_uuid,
                 o_username,
                 o_display_name,
@@ -86,9 +84,9 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 created_at,
                 max_player,
                 password_hash,
-                chat_room_id,
+                chat_room_uuid,
             )| Lobby {
-                id,
+                uuid,
                 name,
                 current_player: BackRef { cached: None },
                 owner: ForeignModelByField::Instance(Box::new(Account {
@@ -102,7 +100,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 created_at,
                 max_player,
                 password_hash,
-                chat_room: ForeignModelByField::Key(chat_room_id),
+                chat_room: ForeignModelByField::Key(chat_room_uuid),
             },
         )
         .collect();
@@ -120,7 +118,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     unreachable!("Owner should be queried!")
                 };
                 LobbyResponse {
-                    id: l.id as u64,
+                    uuid: l.uuid,
                     name: l.name,
                     owner: AccountResponse {
                         uuid: owner.uuid,
@@ -131,7 +129,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                     max_players: l.max_player as u8,
                     password: l.password_hash.is_some(),
                     created_at: DateTime::from_utc(l.created_at, Utc),
-                    chat_room_id: *l.chat_room.key() as u64,
+                    chat_room_uuid: *l.chat_room.key(),
                 }
             })
             .collect(),
@@ -153,11 +151,11 @@ pub struct CreateLobbyRequest {
 
 /// The response of a create lobby request.
 ///
-/// It contains the id of the created lobby and the id of the created chatroom for the lobby
+/// It contains the uuid of the created lobby and the uuid of the created chatroom for the lobby
 #[derive(Serialize, ToSchema)]
 pub struct CreateLobbyResponse {
-    lobby_id: u64,
-    lobby_chat_room_id: u64,
+    lobby_uuid: Uuid,
+    lobby_chat_room_uuid: Uuid,
 }
 
 /// Create a new lobby
@@ -194,7 +192,7 @@ pub async fn create_lobby(
     }
 
     // Check if the executing account is already in a lobby
-    if query!(&mut tx, (LobbyAccount::F.id,))
+    if query!(&mut tx, (LobbyAccount::F.uuid,))
         .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
         .optional()
         .await?
@@ -203,7 +201,7 @@ pub async fn create_lobby(
         return Err(ApiError::AlreadyInALobby);
     }
 
-    if query!(&mut tx, (Lobby::F.id,))
+    if query!(&mut tx, (Lobby::F.uuid,))
         .condition(Lobby::F.owner.equals(uuid.as_ref()))
         .optional()
         .await?
@@ -230,35 +228,39 @@ pub async fn create_lobby(
     };
 
     // Create chatroom for lobby
-    let chat_room_id = insert!(&mut tx, ChatRoomInsert)
+    let chat_room_uuid = insert!(&mut tx, ChatRoomInsert)
         .return_primary_key()
-        .single(&ChatRoomInsert {})
+        .single(&ChatRoomInsert {
+            uuid: Uuid::new_v4(),
+        })
         .await?;
 
     // Place current user in chat
     insert!(&mut tx, ChatRoomMemberInsert)
         .single(&ChatRoomMemberInsert {
-            chat_room: ForeignModelByField::Key(chat_room_id),
+            uuid: Uuid::new_v4(),
+            chat_room: ForeignModelByField::Key(chat_room_uuid),
             member: ForeignModelByField::Key(uuid),
         })
         .await?;
 
     // Create lobby
-    let id = insert!(&mut tx, LobbyInsert)
+    let uuid = insert!(&mut tx, LobbyInsert)
         .return_primary_key()
         .single(&LobbyInsert {
+            uuid: Uuid::new_v4(),
             name: req.name.clone(),
             password_hash: pw_hash,
             max_player: req.max_players as i16,
             owner: ForeignModelByField::Key(uuid),
-            chat_room: ForeignModelByField::Key(chat_room_id),
+            chat_room: ForeignModelByField::Key(chat_room_uuid),
         })
         .await?;
 
     tx.commit().await?;
 
     Ok(Json(CreateLobbyResponse {
-        lobby_id: id as u64,
-        lobby_chat_room_id: chat_room_id as u64,
+        lobby_uuid: uuid,
+        lobby_chat_room_uuid: chat_room_uuid,
     }))
 }

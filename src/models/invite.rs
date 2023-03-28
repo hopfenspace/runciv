@@ -1,5 +1,6 @@
 use rorm::fields::ForeignModel;
 use rorm::{Model, Patch};
+use uuid::Uuid;
 
 use crate::models::{Account, Lobby};
 
@@ -9,8 +10,8 @@ use crate::models::{Account, Lobby};
 #[derive(Model)]
 pub struct Invite {
     /// The primary key of an invite
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// The user that has invoked the invite
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
@@ -32,6 +33,7 @@ pub struct Invite {
 #[derive(Patch)]
 #[rorm(model = "Invite")]
 pub(crate) struct InviteInsert {
+    pub(crate) uuid: Uuid,
     pub(crate) from: ForeignModel<Account>,
     pub(crate) to: ForeignModel<Account>,
     pub(crate) lobby: ForeignModel<Lobby>,

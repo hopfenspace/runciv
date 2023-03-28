@@ -7,7 +7,7 @@ use crate::models::{Account, ChatRoom};
 /// A game identified by its ID
 ///
 /// The game data itself should be stored in a file on disk,
-/// use `id` and `data_id` to create a filename to store it.
+/// use `uuid` and `data_id` to create a filename to store it.
 #[derive(Model)]
 pub struct Game {
     /// Primary key of the game
@@ -44,6 +44,7 @@ pub struct Game {
 #[derive(Patch)]
 #[rorm(model = "Game")]
 pub(crate) struct GameInsert {
+    pub(crate) uuid: Uuid,
     pub(crate) name: String,
     pub(crate) max_players: i16,
     pub(crate) updated_by: ForeignModel<Account>,
@@ -54,8 +55,8 @@ pub(crate) struct GameInsert {
 #[derive(Model)]
 pub struct GameAccount {
     /// Primary key of a game account
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// The game
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
@@ -69,6 +70,7 @@ pub struct GameAccount {
 #[derive(Patch)]
 #[rorm(model = "GameAccount")]
 pub(crate) struct GameAccountInsert {
-    pub game: ForeignModel<Game>,
-    pub player: ForeignModel<Account>,
+    pub(crate) uuid: Uuid,
+    pub(crate) game: ForeignModel<Game>,
+    pub(crate) player: ForeignModel<Account>,
 }

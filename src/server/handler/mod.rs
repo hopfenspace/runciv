@@ -35,6 +35,12 @@ mod version;
 mod websocket;
 mod welcome_page;
 
+/// The uuid in a path
+#[derive(Deserialize, IntoParams)]
+pub struct PathUuid {
+    pub(crate) uuid: Uuid,
+}
+
 /// The result that is used throughout the complete api.
 pub type ApiResult<T> = Result<T, ApiError>;
 
@@ -60,24 +66,17 @@ pub(crate) enum ApiStatusCode {
     InvalidDisplayName = 1010,
     FriendshipAlreadyRequested = 1011,
     AlreadyFriends = 1012,
-    InvalidId = 1013,
-    MissingPrivileges = 1014,
-    InvalidMaxPlayersCount = 1017,
-    AlreadyInALobby = 1018,
-    InvalidUuid = 1019,
-    InvalidLobbyId = 1020,
-    InvalidFriendId = 1021,
-    GameNotFound = 1022,
+    MissingPrivileges = 1013,
+    InvalidMaxPlayersCount = 1014,
+    AlreadyInALobby = 1015,
+    InvalidUuid = 1016,
+    InvalidLobbyUuid = 1017,
+    InvalidFriendUuid = 1018,
+    GameNotFound = 1019,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
     SessionError = 2002,
-}
-
-/// Parameter for accessing resources by path via uuid
-#[derive(Deserialize, IntoParams)]
-pub struct PathUuid {
-    pub(crate) uuid: Uuid,
 }
 
 /// The Response that is returned in case of an error
@@ -131,8 +130,6 @@ pub enum ApiError {
     FriendshipAlreadyRequested,
     /// Users are already friends
     AlreadyFriends,
-    /// Invalid id specified
-    InvalidId,
     /// Missing privileges to execute this operation
     MissingPrivileges,
     /// Invalid max_players count
@@ -141,8 +138,8 @@ pub enum ApiError {
     AlreadyInALobby,
     /// The provided uuid was not valid
     InvalidUuid,
-    /// An invalid lobby id was specified
-    InvalidLobbyId,
+    /// An invalid lobby uuid was specified
+    InvalidLobbyUuid,
     /// A friend in an invalid state was specified
     InvalidFriendState,
     /// The requested game state could not be found on the server
@@ -187,14 +184,13 @@ impl Display for ApiError {
             ApiError::InvalidDisplayName => write!(f, "Invalid display name"),
             ApiError::FriendshipAlreadyRequested => write!(f, "Friendship was already requested"),
             ApiError::AlreadyFriends => write!(f, "You are already friends"),
-            ApiError::InvalidId => write!(f, "Invalid id specified"),
             ApiError::MissingPrivileges => {
                 write!(f, "Missing privileges to execute this operation")
             }
             ApiError::InvalidMaxPlayersCount => write!(f, "Invalid max_players count"),
             ApiError::AlreadyInALobby => write!(f, "Already in a lobby"),
             ApiError::InvalidUuid => write!(f, "The provided uuid was not valid"),
-            ApiError::InvalidLobbyId => write!(f, "The provided lobby id was not valid"),
+            ApiError::InvalidLobbyUuid => write!(f, "The provided lobby uuid was not valid"),
             ApiError::InvalidFriendState => write!(f, "Invalid friend state"),
             ApiError::GameNotFound => write!(f, "The game was not found on the server"),
         }
@@ -341,13 +337,6 @@ impl actix_web::ResponseError for ApiError {
                     self.to_string(),
                 ))
             }
-            ApiError::InvalidId => {
-                debug!("Invalid id specified");
-                HttpResponse::BadRequest().json(ApiErrorResponse::new(
-                    ApiStatusCode::InvalidId,
-                    self.to_string(),
-                ))
-            }
             ApiError::MissingPrivileges => {
                 debug!("Missing privileges");
                 HttpResponse::BadRequest().json(ApiErrorResponse::new(
@@ -373,12 +362,12 @@ impl actix_web::ResponseError for ApiError {
                 ApiStatusCode::InvalidUuid,
                 self.to_string(),
             )),
-            ApiError::InvalidLobbyId => HttpResponse::BadRequest().json(ApiErrorResponse::new(
-                ApiStatusCode::InvalidLobbyId,
+            ApiError::InvalidLobbyUuid => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::InvalidLobbyUuid,
                 self.to_string(),
             )),
             ApiError::InvalidFriendState => HttpResponse::BadRequest().json(ApiErrorResponse::new(
-                ApiStatusCode::InvalidFriendId,
+                ApiStatusCode::InvalidFriendUuid,
                 self.to_string(),
             )),
             ApiError::GameNotFound => HttpResponse::BadRequest().json(ApiErrorResponse::new(

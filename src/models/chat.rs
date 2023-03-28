@@ -1,5 +1,6 @@
 use rorm::fields::{BackRef, ForeignModel};
 use rorm::{field, Model, Patch};
+use uuid::Uuid;
 
 use crate::models::Account;
 
@@ -7,8 +8,8 @@ use crate::models::Account;
 #[derive(Model)]
 pub struct ChatRoom {
     /// The primary key of a chat
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// A backref to the members of a specific chatroom
     pub members: BackRef<field!(ChatRoomMember::F.chat_room)>,
@@ -19,14 +20,16 @@ pub struct ChatRoom {
 
 #[derive(Patch)]
 #[rorm(model = "ChatRoom")]
-pub(crate) struct ChatRoomInsert;
+pub(crate) struct ChatRoomInsert {
+    pub(crate) uuid: Uuid,
+}
 
 /// The member <-> chatroom relation
 #[derive(Model)]
 pub struct ChatRoomMember {
     /// The primary key of a chatroom
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// The relation to a chatroom
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
@@ -45,16 +48,17 @@ pub struct ChatRoomMember {
 #[derive(Patch)]
 #[rorm(model = "ChatRoomMember")]
 pub(crate) struct ChatRoomMemberInsert {
-    pub chat_room: ForeignModel<ChatRoom>,
-    pub member: ForeignModel<Account>,
+    pub(crate) uuid: Uuid,
+    pub(crate) chat_room: ForeignModel<ChatRoom>,
+    pub(crate) member: ForeignModel<Account>,
 }
 
 /// A message of a chatroom
 #[derive(Model)]
 pub struct ChatRoomMessage {
     /// The primary key of a chatroom message
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// The account that send the message
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
@@ -76,6 +80,7 @@ pub struct ChatRoomMessage {
 #[derive(Patch)]
 #[rorm(model = "ChatRoomMessage")]
 pub(crate) struct ChatRoomMessageInsert {
+    pub(crate) uuid: Uuid,
     pub(crate) chat_room: ForeignModel<ChatRoom>,
     pub(crate) sender: ForeignModel<Account>,
     pub(crate) message: String,

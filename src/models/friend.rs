@@ -1,5 +1,6 @@
 use rorm::fields::ForeignModel;
 use rorm::{Model, Patch};
+use uuid::Uuid;
 
 use crate::models::{Account, ChatRoom};
 
@@ -9,8 +10,8 @@ use crate::models::{Account, ChatRoom};
 #[derive(Model)]
 pub struct Friend {
     /// Primary key of this friend pair
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// This field is true, if the friendship is not confirmed yet.
     pub is_request: bool,
@@ -31,7 +32,8 @@ pub struct Friend {
 #[derive(Patch)]
 #[rorm(model = "Friend")]
 pub(crate) struct FriendInsert {
-    pub is_request: bool,
-    pub from: ForeignModel<Account>,
-    pub to: ForeignModel<Account>,
+    pub(crate) uuid: Uuid,
+    pub(crate) is_request: bool,
+    pub(crate) from: ForeignModel<Account>,
+    pub(crate) to: ForeignModel<Account>,
 }

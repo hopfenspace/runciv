@@ -6,20 +6,20 @@ use rorm::fields::ForeignModelByField;
 use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::{Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert};
-use crate::server::handler::{AccountResponse, ApiError, ApiResult, OnlineAccountResponse};
+use crate::server::handler::{
+    AccountResponse, ApiError, ApiResult, OnlineAccountResponse, PathUuid,
+};
 
 /// A single friend
 #[derive(Serialize, ToSchema)]
 pub struct FriendResponse {
-    #[schema(example = 1337)]
-    id: u64,
-    #[schema(example = 1337)]
-    chat_id: u64,
+    uuid: Uuid,
+    chat_uuid: Uuid,
     from: AccountResponse,
     to: OnlineAccountResponse,
 }
@@ -27,8 +27,7 @@ pub struct FriendResponse {
 /// A single friend request
 #[derive(Serialize, ToSchema)]
 pub struct FriendRequestResponse {
-    #[schema(example = 1337)]
-    id: u64,
+    uuid: Uuid,
     from: AccountResponse,
     to: AccountResponse,
 }
@@ -80,7 +79,7 @@ pub async fn get_friends(
     let friends_raw = query!(
         &mut tx,
         (
-            Friend::F.id,
+            Friend::F.uuid,
             Friend::F.from.uuid,
             Friend::F.from.username,
             Friend::F.from.display_name,
@@ -128,7 +127,7 @@ pub async fn get_friends(
     let friends = Vec::from_iter(friends_raw.into_iter().zip(online_state).map(
         |(
             (
-                id,
+                uuid,
                 from_uuid,
                 from_username,
                 from_display_name,
@@ -139,8 +138,8 @@ pub async fn get_friends(
             ),
             online,
         )| FriendResponse {
-            id: id as u64,
-            chat_id: *chat_room.key() as u64,
+            uuid,
+            chat_uuid: *chat_room.key(),
             from: AccountResponse {
                 uuid: from_uuid,
                 username: from_username,
@@ -160,7 +159,7 @@ pub async fn get_friends(
         query!(
             &mut tx,
             (
-                Friend::F.id,
+                Friend::F.uuid,
                 Friend::F.from.uuid,
                 Friend::F.from.username,
                 Friend::F.from.display_name,
@@ -178,7 +177,7 @@ pub async fn get_friends(
         .into_iter()
         .map(
             |(
-                id,
+                uuid,
                 from_uuid,
                 from_username,
                 from_display_name,
@@ -186,7 +185,7 @@ pub async fn get_friends(
                 to_username,
                 to_display_name,
             )| FriendRequestResponse {
-                id: id as u64,
+                uuid,
                 from: AccountResponse {
                     uuid: from_uuid,
                     username: from_username,
@@ -206,7 +205,7 @@ pub async fn get_friends(
         query!(
             &mut tx,
             (
-                Friend::F.id,
+                Friend::F.uuid,
                 Friend::F.from.uuid,
                 Friend::F.from.username,
                 Friend::F.from.display_name,
@@ -224,7 +223,7 @@ pub async fn get_friends(
         .into_iter()
         .map(
             |(
-                id,
+                uuid,
                 from_uuid,
                 from_username,
                 from_display_name,
@@ -232,7 +231,7 @@ pub async fn get_friends(
                 to_username,
                 to_display_name,
             )| FriendRequestResponse {
-                id: id as u64,
+                uuid,
                 from: AccountResponse {
                     uuid: from_uuid,
                     username: from_username,
@@ -316,6 +315,7 @@ pub async fn create_friend_request(
     // Create new friendship request
     insert!(&mut tx, FriendInsert)
         .single(&FriendInsert {
+            uuid: Uuid::new_v4(),
             is_request: true,
             from: ForeignModelByField::Key(uuid),
             to: ForeignModelByField::Key(target.uuid),
@@ -327,13 +327,6 @@ pub async fn create_friend_request(
     Ok(HttpResponse::Ok().finish())
 }
 
-/// The id of a friend or friend request
-#[derive(Deserialize, IntoParams)]
-pub struct FriendId {
-    #[param(example = 1337)]
-    id: u64,
-}
-
 /// Don't want your friends anymore? Just delete them!
 #[utoipa::path(
     tag = "Friends",
@@ -343,12 +336,12 @@ pub struct FriendId {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    params(FriendId),
+    params(PathUuid),
     security(("session_cookie" = []))
 )]
-#[delete("/friends/{id}")]
+#[delete("/friends/{uuid}")]
 pub async fn delete_friend(
-    path: Path<FriendId>,
+    path: Path<PathUuid>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<HttpResponse> {
@@ -358,10 +351,10 @@ pub async fn delete_friend(
 
     // Check if friend exists
     let f = query!(&mut tx, Friend)
-        .condition(Friend::F.id.equals(path.id as i64))
+        .condition(Friend::F.uuid.equals(path.uuid.as_ref()))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidId)?;
+        .ok_or(ApiError::InvalidUuid)?;
 
     // If executing user is neither from nor to, return permission denied
     if *f.from.key() != uuid && *f.to.key() != uuid {
@@ -384,12 +377,12 @@ pub async fn delete_friend(
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    params(FriendId),
+    params(PathUuid),
     security(("session_cookie" = []))
 )]
-#[put("/friends/{id}")]
+#[put("/friends/{uuid}")]
 pub async fn accept_friend_request(
-    path: Path<FriendId>,
+    path: Path<PathUuid>,
     session: Session,
     db: Data<Database>,
 ) -> ApiResult<HttpResponse> {
@@ -400,12 +393,12 @@ pub async fn accept_friend_request(
     // Check if friend request exists
     let f = query!(&mut tx, Friend)
         .condition(and!(
-            Friend::F.id.equals(path.id as i64),
+            Friend::F.uuid.equals(path.uuid.as_ref()),
             Friend::F.is_request.equals(true)
         ))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidId)?;
+        .ok_or(ApiError::InvalidUuid)?;
 
     // If executing user is neither from nor to, return permission denied
     if *f.from.key() != uuid && *f.to.key() != uuid {
@@ -419,25 +412,30 @@ pub async fn accept_friend_request(
 
     insert!(&mut tx, FriendInsert)
         .single(&FriendInsert {
+            uuid: Uuid::new_v4(),
             is_request: false,
             from: ForeignModelByField::Key(*f.to.key()),
             to: ForeignModelByField::Key(*f.from.key()),
         })
         .await?;
 
-    let chat_room_id = insert!(&mut tx, ChatRoomInsert)
+    let chat_room_uuid = insert!(&mut tx, ChatRoomInsert)
         .return_primary_key()
-        .single(&ChatRoomInsert {})
+        .single(&ChatRoomInsert {
+            uuid: Uuid::new_v4(),
+        })
         .await?;
 
     insert!(&mut tx, ChatRoomMemberInsert)
         .bulk(&[
             ChatRoomMemberInsert {
-                chat_room: ForeignModelByField::Key(chat_room_id),
+                uuid: Uuid::new_v4(),
+                chat_room: ForeignModelByField::Key(chat_room_uuid),
                 member: ForeignModelByField::Key(*f.to.key()),
             },
             ChatRoomMemberInsert {
-                chat_room: ForeignModelByField::Key(chat_room_id),
+                uuid: Uuid::new_v4(),
+                chat_room: ForeignModelByField::Key(chat_room_uuid),
                 member: ForeignModelByField::Key(*f.from.key()),
             },
         ])

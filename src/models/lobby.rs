@@ -1,5 +1,6 @@
 use rorm::fields::{BackRef, ForeignModel};
 use rorm::{field, Model, Patch};
+use uuid::Uuid;
 
 use crate::models::{Account, ChatRoom};
 
@@ -9,8 +10,8 @@ use crate::models::{Account, ChatRoom};
 #[derive(Model)]
 pub struct Lobby {
     /// Primary key of the lobby
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// Name of the lobby
     #[rorm(max_length = 255)]
@@ -42,6 +43,7 @@ pub struct Lobby {
 #[derive(Patch)]
 #[rorm(model = "Lobby")]
 pub(crate) struct LobbyInsert {
+    pub(crate) uuid: Uuid,
     pub(crate) name: String,
     pub(crate) owner: ForeignModel<Account>,
     pub(crate) password_hash: Option<String>,
@@ -53,8 +55,8 @@ pub(crate) struct LobbyInsert {
 #[derive(Model)]
 pub struct LobbyAccount {
     /// Primary key of a lobby player
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// The lobby
     #[rorm(on_delete = "Cascade", on_update = "Cascade")]
@@ -68,6 +70,7 @@ pub struct LobbyAccount {
 #[derive(Patch)]
 #[rorm(model = "LobbyAccount")]
 pub(crate) struct LobbyAccountInsert {
-    pub lobby: ForeignModel<Lobby>,
-    pub player: ForeignModel<Account>,
+    pub(crate) uuid: Uuid,
+    pub(crate) lobby: ForeignModel<Lobby>,
+    pub(crate) player: ForeignModel<Account>,
 }

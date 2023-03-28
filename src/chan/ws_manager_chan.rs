@@ -59,7 +59,7 @@ pub enum WsMessage {
     /// This variant is sent from the client that has finished its turn
     FinishedTurn {
         /// Identifier of the game
-        game_id: u64,
+        game_uuid: Uuid,
         /// Data of the game
         game_data: Box<RawValue>,
     },
@@ -68,7 +68,7 @@ pub enum WsMessage {
     /// This variant is sent from the server to all accounts that are in the game.
     UpdateGameData {
         /// Identifier of the game
-        game_id: u64,
+        game_uuid: Uuid,
         /// Data of the game
         game_data: Box<RawValue>,
         /// A unique counter identifying a game state, which is changed every time a
@@ -80,32 +80,32 @@ pub enum WsMessage {
     /// Notification for clients if a client in their game disconnected
     ClientDisconnected {
         /// Identifier of the game
-        game_id: u64,
+        game_uuid: Uuid,
         /// The identifier of the client that disconnected
-        uuid: Uuid,
+        client_uuid: Uuid,
     },
     /// Notification for clients if a client in their game reconnected
     ClientReconnected {
         /// Identifier of the game
-        game_id: u64,
+        game_uuid: Uuid,
         /// The identifier of the client that disconnected
-        uuid: Uuid,
+        client_uuid: Uuid,
     },
     /// A new chat message is sent to the client.
     IncomingChatMessage {
         /// Identifier of the chat, the message originated from
-        chat_id: u64,
+        chat_uuid: Uuid,
         /// The new message
         message: ChatMessage,
     },
     /// An invite is sent to the client.
     IncomingInvite {
-        /// The id of the invite
-        invite_id: u64,
+        /// The uuid of the invite
+        invite_uuid: Uuid,
         /// The user that invoked the invite
         from: AccountResponse,
         /// The lobby to join
-        lobby_id: u64,
+        lobby_uuid: Uuid,
     },
 }
 

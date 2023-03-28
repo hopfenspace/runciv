@@ -7,19 +7,18 @@ use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use rorm::{and, query, Database, Model};
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::models::{ChatRoom, ChatRoomMember, ChatRoomMessage, Friend, LobbyAccount};
-use crate::server::handler::{AccountResponse, ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 
 /// The message of a chatroom
 ///
-/// The parameter `id` should be used to uniquely identify a message
+/// The parameter `uuid` is used to uniquely identify a message
 #[derive(Serialize, ToSchema, Eq, Deserialize, Clone, Debug)]
 pub struct ChatMessage {
-    #[schema(example = 1337)]
-    id: i64,
+    uuid: Uuid,
     sender: AccountResponse,
     #[schema(example = "Hello there!")]
     message: String,
@@ -40,7 +39,7 @@ impl PartialOrd for ChatMessage {
 
 impl PartialEq for ChatMessage {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.uuid == other.uuid
     }
 }
 
@@ -61,13 +60,6 @@ pub struct GetChatResponse {
     messages: Vec<ChatMessage>,
 }
 
-/// The id of a chat
-#[derive(Deserialize, IntoParams)]
-pub struct ChatId {
-    #[param(example = 1337)]
-    id: u64,
-}
-
 /// Retrieve the messages of a chatroom
 ///
 /// `messages` should be sorted by the datetime of `message.created_at`.
@@ -84,12 +76,12 @@ pub struct ChatId {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    params(ChatId),
+    params(PathUuid),
     security(("session_cookie" = []))
 )]
-#[get("/chats/{id}")]
+#[get("/chats/{uuid}")]
 pub async fn get_chat(
-    path: Path<ChatId>,
+    path: Path<PathUuid>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GetChatResponse>> {
@@ -97,16 +89,16 @@ pub async fn get_chat(
 
     let mut tx = db.start_transaction().await?;
 
-    query!(&mut tx, (ChatRoom::F.id,))
-        .condition(ChatRoom::F.id.equals(path.id as i64))
+    query!(&mut tx, (ChatRoom::F.uuid,))
+        .condition(ChatRoom::F.uuid.equals(path.uuid.as_ref()))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidId)?;
+        .ok_or(ApiError::InvalidUuid)?;
 
     // Check if user is allowed to access chat data
-    let user_count = query!(&mut tx, (ChatRoomMember::F.id.count(),))
+    let user_count = query!(&mut tx, (ChatRoomMember::F.uuid.count(),))
         .condition(and!(
-            ChatRoomMember::F.chat_room.equals(path.id as i64),
+            ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()),
             ChatRoomMember::F.member.uuid.equals(uuid.as_ref())
         ))
         .one()
@@ -126,14 +118,14 @@ pub async fn get_chat(
             ChatRoomMember::F.member.display_name
         )
     )
-    .condition(ChatRoomMember::F.chat_room.equals(path.id as i64))
+    .condition(ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()))
     .all()
     .await?;
 
     let messages = query!(
         &mut tx,
         (
-            ChatRoomMessage::F.id,
+            ChatRoomMessage::F.uuid,
             ChatRoomMessage::F.message,
             ChatRoomMessage::F.created_at,
             ChatRoomMessage::F.sender.uuid,
@@ -141,7 +133,7 @@ pub async fn get_chat(
             ChatRoomMessage::F.sender.display_name
         )
     )
-    .condition(ChatRoomMessage::F.chat_room.equals(path.id as i64))
+    .condition(ChatRoomMessage::F.chat_room.equals(path.uuid.as_ref()))
     .all()
     .await?;
 
@@ -151,9 +143,9 @@ pub async fn get_chat(
         messages: messages
             .into_iter()
             .map(
-                |(id, message, created_at, sender_uuid, sender_username, sender_display_name)| {
+                |(uuid, message, created_at, sender_uuid, sender_username, sender_display_name)| {
                     ChatMessage {
-                        id,
+                        uuid,
                         message,
                         created_at: DateTime::from_utc(created_at, Utc),
                         sender: AccountResponse {
@@ -185,10 +177,8 @@ pub async fn get_chat(
 /// All chat rooms your user has access to
 #[derive(Serialize, ToSchema)]
 pub struct GetAllChatsResponse {
-    #[schema(example = "[1337]")]
-    friend_chat_rooms: Vec<u64>,
-    #[schema(example = "[1337]")]
-    lobby_chat_rooms: Vec<u64>,
+    friend_chat_rooms: Vec<Uuid>,
+    lobby_chat_rooms: Vec<Uuid>,
 }
 
 /// Retrieve all chats the executing user has access to.
@@ -213,7 +203,7 @@ pub async fn get_all_chats(
 
     let mut tx = db.start_transaction().await?;
 
-    let friend_chat_room_ids = query!(&mut tx, (Friend::F.chat_room.id,))
+    let friend_chat_room_ids = query!(&mut tx, (Friend::F.chat_room.uuid,))
         .condition(and!(
             Friend::F.is_request.equals(false),
             Friend::F.from.uuid.equals(uuid.as_ref())
@@ -221,7 +211,7 @@ pub async fn get_all_chats(
         .all()
         .await?;
 
-    let lobby_chat_room_ids = query!(&mut tx, (LobbyAccount::F.lobby.chat_room.id))
+    let lobby_chat_room_ids = query!(&mut tx, (LobbyAccount::F.lobby.chat_room.uuid))
         .condition(LobbyAccount::F.player.uuid.equals(uuid.as_ref()))
         .all()
         .await?;
@@ -229,13 +219,7 @@ pub async fn get_all_chats(
     tx.commit().await?;
 
     Ok(Json(GetAllChatsResponse {
-        lobby_chat_rooms: lobby_chat_room_ids
-            .into_iter()
-            .map(|(x,)| x as u64)
-            .collect(),
-        friend_chat_rooms: friend_chat_room_ids
-            .into_iter()
-            .map(|(x,)| x as u64)
-            .collect(),
+        lobby_chat_rooms: lobby_chat_room_ids.into_iter().map(|(x,)| x).collect(),
+        friend_chat_rooms: friend_chat_room_ids.into_iter().map(|(x,)| x).collect(),
     }))
 }

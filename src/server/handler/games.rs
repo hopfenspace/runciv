@@ -15,7 +15,7 @@ use crate::models::Game;
 use crate::server::handler::{AccountResponse, ApiError, ApiResult};
 use crate::server::RuntimeSettings;
 
-/// A single game state identified by its ID and state identifier
+/// A single game state identified by its Uuid and state identifier
 ///
 /// If the state (`game_data_id`) of a known game differs from the last known
 /// identifier, the server has a newer state of the game. The `last_activity`
@@ -31,8 +31,7 @@ pub struct GameStateResponse {
     max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
-    #[schema(example = 1337)]
-    chat_room_id: u64,
+    chat_room_uuid: Uuid,
 }
 
 /// A shortened game state identified by its ID and state identifier
@@ -51,8 +50,7 @@ pub struct GameOverviewResponse {
     max_players: i16,
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
-    #[schema(example = 1337)]
-    chat_room_id: u64,
+    chat_room_uuid: Uuid,
 }
 
 /// An overview of games a player participates in
@@ -126,7 +124,7 @@ pub async fn get_open_games(
                     username: updated_by_username,
                     display_name: updated_by_display_name,
                 },
-                chat_room_id: *chat_room.key() as u64,
+                chat_room_uuid: *chat_room.key(),
             }
         },
     )
@@ -163,8 +161,8 @@ pub async fn get_game(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GameStateResponse>> {
-    let game_uuid = path.uuid;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+    let game_uuid = path.uuid;
 
     let (
         data_id,
@@ -216,7 +214,7 @@ pub async fn get_game(
             username: updated_by_username.to_string(),
             display_name: updated_by_display_name.to_string(),
         },
-        chat_room_id: *chat_room.key() as u64,
+        chat_room_uuid: *chat_room.key(),
     }))
 }
 
