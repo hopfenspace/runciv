@@ -22,6 +22,7 @@ use crate::server::RuntimeSettings;
 /// field is a convenience attribute and shouldn't be used for update checks.
 #[derive(Serialize, ToSchema)]
 pub struct GameStateResponse {
+    #[schema(example = "e25vdGU6VGhpcyBpcyBhbiBleGFtcGxlfQo=")]
     game_data: String,
     #[schema(example = 1337)]
     game_data_id: u64,
@@ -234,6 +235,7 @@ pub struct GameUploadResponse {
 pub struct GameUploadRequest {
     #[schema(example = 1337)]
     game_id: u64,
+    #[schema(example = "e25vdGU6VGhpcyBpcyBhbiBleGFtcGxlfQo=")]
     game_data: String,
 }
 
