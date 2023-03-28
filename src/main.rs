@@ -38,7 +38,6 @@ pub enum Command {
     /// Run database migrations
     Migrate {
         /// The directory where the migrations are located
-        #[clap(long)]
         migration_dir: String,
     },
 }
