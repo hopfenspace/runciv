@@ -1,5 +1,6 @@
 use rorm::fields::{BackRef, ForeignModel};
 use rorm::{field, Model, Patch};
+use uuid::Uuid;
 
 use crate::models::{Account, ChatRoom};
 
@@ -10,8 +11,8 @@ use crate::models::{Account, ChatRoom};
 #[derive(Model)]
 pub struct Game {
     /// Primary key of the game
-    #[rorm(id)]
-    pub id: i64,
+    #[rorm(primary_key)]
+    pub uuid: Uuid,
 
     /// Unique identifier of the state of the data
     #[rorm(default = 0)]

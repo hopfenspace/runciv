@@ -42,8 +42,7 @@ pub struct GameStateResponse {
 /// field is a convenience attribute and shouldn't be used for update checks.
 #[derive(Serialize, ToSchema)]
 pub struct GameOverviewResponse {
-    #[schema(example = 1337)]
-    game_id: u64,
+    game_uuid: Uuid,
     #[schema(example = 1337)]
     game_data_id: u64,
     #[schema(example = "Herbert's game")]
@@ -89,7 +88,7 @@ pub async fn get_open_games(
     let open_games = query!(
         db.as_ref(),
         (
-            Game::F.id,
+            Game::F.uuid,
             Game::F.data_id,
             Game::F.name,
             Game::F.max_players,
@@ -106,7 +105,7 @@ pub async fn get_open_games(
     .into_iter()
     .map(
         |(
-            id,
+            game_uuid,
             data_id,
             name,
             max_players,
@@ -117,7 +116,7 @@ pub async fn get_open_games(
             chat_room,
         )| {
             GameOverviewResponse {
-                game_id: id as u64,
+                game_uuid,
                 game_data_id: data_id as u64,
                 name,
                 max_players,
@@ -136,11 +135,10 @@ pub async fn get_open_games(
     Ok(Json(GetGameOverviewResponse { games: open_games }))
 }
 
-/// The ID of a game
+/// The Uuid of a game
 #[derive(Deserialize, IntoParams)]
-pub struct GameId {
-    #[param(example = 1337)]
-    id: u64,
+pub struct GameUuid {
+    uuid: Uuid,
 }
 
 /// Retrieves a single game which is currently open (actively played)
@@ -155,17 +153,17 @@ pub struct GameId {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
-    params(GameId),
+    params(GameUuid),
     security(("session_cookie" = []))
 )]
-#[get("/games/{id}")]
+#[get("/games/{uuid}")]
 pub async fn get_game(
-    path: Path<GameId>,
+    path: Path<GameUuid>,
     settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GameStateResponse>> {
-    let game_id = path.id;
+    let game_uuid = path.uuid;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let (
@@ -191,7 +189,7 @@ pub async fn get_game(
         )
     )
     .condition(and!(
-        Game::F.id.equals(game_id as i64),
+        Game::F.uuid.equals(game_uuid.as_ref()),
         Game::F.current_players.player.uuid.equals(uuid.as_ref())
     ))
     .optional()
@@ -201,7 +199,7 @@ pub async fn get_game(
         ApiError::GameNotFound
     })?;
 
-    let filename = format!("game_{game_id}_{data_id}.txt");
+    let filename = format!("game_{game_uuid}_{data_id}.txt");
     let path = StdPath::new(&settings.game_data_path).join(&filename);
     let content = read_to_string(&path).await.map_err(|e| {
         error!("Game data expected in '{filename}' couldn't be read: {e}");
@@ -232,8 +230,7 @@ pub struct GameUploadResponse {
 /// The request a user sends to the server to upload a new game state
 #[derive(Deserialize, ToSchema)]
 pub struct GameUploadRequest {
-    #[schema(example = 1337)]
-    game_id: u64,
+    game_uuid: Uuid,
     game_data: String,
 }
 
@@ -259,13 +256,13 @@ pub async fn push_game_update(
     db: Data<Database>,
     session: Session,
 ) -> ApiResult<Json<GameUploadResponse>> {
-    let game_id = req.game_id as i64;
+    let game_uuid = req.game_uuid;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     // Lookup the game and verify that the player is actually participating in it
     let (old_data_id,) = query!(db.as_ref(), (Game::F.data_id,))
         .condition(and!(
-            Game::F.id.equals(game_id),
+            Game::F.uuid.equals(game_uuid.as_ref()),
             Game::F.current_players.player.uuid.equals(uuid.as_ref())
         ))
         .optional()
@@ -276,7 +273,7 @@ pub async fn push_game_update(
     let new_data_id = old_data_id + 1;
 
     // Save a new file with the updated game state to disk
-    let new_filename = format!("game_{game_id}_{new_data_id}.txt");
+    let new_filename = format!("game_{game_uuid}_{new_data_id}.txt");
     let new_path = StdPath::new(&settings.game_data_path).join(&new_filename);
     if let Err(e) = write(&new_path, &req.game_data).await {
         error!("Game data could not be saved to '{new_filename}': {e}");
@@ -289,11 +286,11 @@ pub async fn push_game_update(
     update!(db.as_ref(), Game)
         .set(Game::F.data_id, new_data_id)
         .set(Game::F.updated_by, updated_by.as_ref())
-        .condition(Game::F.id.equals(game_id))
+        .condition(Game::F.uuid.equals(game_uuid.as_ref()))
         .await?;
 
     // Remove the old file from the filesystem
-    let old_filename = format!("game_{game_id}_{old_data_id}.txt");
+    let old_filename = format!("game_{game_uuid}_{old_data_id}.txt");
     let old_path = StdPath::new(&settings.game_data_path).join(&old_filename);
     if let Err(e) = remove_file(&old_path).await {
         warn!("Outdated data in '{old_filename}' could not be removed and may leak: {e}");
