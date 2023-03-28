@@ -22,6 +22,8 @@ struct CommonMessages {
 }
 
 static COMMON: Lazy<CommonMessages> = Lazy::new(|| CommonMessages {
+    // Fine as we can't do anything here, if [WsMessage] does not want to serialize anymore
+    #[allow(clippy::unwrap_used)]
     invalid_message: ByteString::from(serde_json::to_string(&WsMessage::InvalidMessage).unwrap()),
 });
 

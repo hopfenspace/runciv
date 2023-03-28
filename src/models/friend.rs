@@ -26,7 +26,7 @@ pub struct Friend {
 
     /// The chatroom of this friend request
     #[rorm(on_update = "Cascade", on_delete = "Cascade")]
-    pub chat_room: ForeignModel<ChatRoom>,
+    pub chat_room: Option<ForeignModel<ChatRoom>>,
 }
 
 #[derive(Patch)]
@@ -36,4 +36,14 @@ pub(crate) struct FriendInsert {
     pub(crate) is_request: bool,
     pub(crate) from: ForeignModel<Account>,
     pub(crate) to: ForeignModel<Account>,
+}
+
+#[derive(Patch)]
+#[rorm(model = "Friend")]
+pub(crate) struct FriendWithChatInsert {
+    pub(crate) uuid: Uuid,
+    pub(crate) is_request: bool,
+    pub(crate) from: ForeignModel<Account>,
+    pub(crate) to: ForeignModel<Account>,
+    pub(crate) chat_room: Option<ForeignModel<ChatRoom>>,
 }

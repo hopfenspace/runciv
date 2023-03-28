@@ -10,7 +10,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
-use crate::models::{Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert};
+use crate::models::{
+    Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert, FriendWithChatInsert,
+};
 use crate::server::handler::{
     AccountResponse, ApiError, ApiResult, OnlineAccountResponse, PathUuid,
 };
@@ -120,15 +122,20 @@ pub async fn get_friends(
 
     // Retrieve all friendships
     let friends = Vec::from_iter(friends_raw.into_iter().zip(online_state).map(
-        |((uuid, to_uuid, to_username, to_display_name, chat_room), online)| FriendResponse {
-            uuid,
-            chat_uuid: *chat_room.key(),
-            friend: OnlineAccountResponse {
-                uuid: to_uuid,
-                username: to_username,
-                display_name: to_display_name,
-                online,
-            },
+        |((uuid, to_uuid, to_username, to_display_name, chat_room), online)| {
+            // As all friend that are not in request state should have a chat room, this should be
+            // fine unless the database is in an invalid state
+            #[allow(clippy::unwrap_used)]
+            FriendResponse {
+                uuid,
+                chat_uuid: *chat_room.unwrap().key(),
+                friend: OnlineAccountResponse {
+                    uuid: to_uuid,
+                    username: to_username,
+                    display_name: to_display_name,
+                    online,
+                },
+            }
         },
     ));
 
@@ -383,20 +390,7 @@ pub async fn accept_friend_request(
         return Err(ApiError::MissingPrivileges);
     }
 
-    update!(&mut tx, Friend)
-        .set(Friend::F.is_request, false)
-        .exec()
-        .await?;
-
-    insert!(&mut tx, FriendInsert)
-        .single(&FriendInsert {
-            uuid: Uuid::new_v4(),
-            is_request: false,
-            from: ForeignModelByField::Key(*f.to.key()),
-            to: ForeignModelByField::Key(*f.from.key()),
-        })
-        .await?;
-
+    // Create the chat room for both users
     let chat_room_uuid = insert!(&mut tx, ChatRoomInsert)
         .return_primary_key()
         .single(&ChatRoomInsert {
@@ -417,6 +411,22 @@ pub async fn accept_friend_request(
                 member: ForeignModelByField::Key(*f.from.key()),
             },
         ])
+        .await?;
+
+    update!(&mut tx, Friend)
+        .set(Friend::F.is_request, false)
+        .set(Friend::F.chat_room, Some(chat_room_uuid.as_ref()))
+        .exec()
+        .await?;
+
+    insert!(&mut tx, FriendWithChatInsert)
+        .single(&FriendWithChatInsert {
+            uuid: Uuid::new_v4(),
+            is_request: false,
+            from: ForeignModelByField::Key(*f.to.key()),
+            to: ForeignModelByField::Key(*f.from.key()),
+            chat_room: Some(ForeignModelByField::Key(chat_room_uuid)),
+        })
         .await?;
 
     tx.commit().await?;

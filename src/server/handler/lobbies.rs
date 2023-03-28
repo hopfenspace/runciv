@@ -117,6 +117,8 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 let Some(owner) = l.owner.instance() else {
                     unreachable!("Owner should be queried!")
                 };
+                // Ok as current_player is populated before
+                #[allow(clippy::unwrap_used)]
                 LobbyResponse {
                     uuid: l.uuid,
                     name: l.name,

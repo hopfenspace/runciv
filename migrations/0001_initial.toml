@@ -1,5 +1,5 @@
 [Migration]
-Hash = "1221407729477206445"
+Hash = "1007693435009946095"
 Initial = true
 Replaces = []
 
@@ -312,7 +312,27 @@ Type = "not_null"
 
 [[Migration.Operations]]
 Type = "CreateField"
-Model = "chatroommember"
+Model = "game"
+
+[Migration.Operations.Field]
+Name = "updated_by"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "game"
 
 [Migration.Operations.Field]
 Name = "chat_room"
@@ -332,10 +352,30 @@ Type = "not_null"
 
 [[Migration.Operations]]
 Type = "CreateField"
-Model = "chatroommember"
+Model = "gameaccount"
 
 [Migration.Operations.Field]
-Name = "member"
+Name = "game"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "game"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "gameaccount"
+
+[Migration.Operations.Field]
+Name = "player"
 Type = "varbinary"
 
 [[Migration.Operations.Field.Annotations]]
@@ -392,6 +432,203 @@ Type = "not_null"
 
 [[Migration.Operations]]
 Type = "CreateField"
+Model = "invite"
+
+[Migration.Operations.Field]
+Name = "from"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "invite"
+
+[Migration.Operations.Field]
+Name = "to"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "invite"
+
+[Migration.Operations.Field]
+Name = "lobby"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "lobby"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "chatroommember"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "chatroommember"
+
+[Migration.Operations.Field]
+Name = "member"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "from"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "to"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "friend"
+
+[Migration.Operations.Field]
+Name = "chat_room"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "chatroom"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobbyaccount"
+
+[Migration.Operations.Field]
+Name = "lobby"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "lobby"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
+Model = "lobbyaccount"
+
+[Migration.Operations.Field]
+Name = "player"
+Type = "varbinary"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "foreign_key"
+
+[Migration.Operations.Field.Annotations.Value]
+TableName = "account"
+ColumnName = "uuid"
+OnDelete = "Cascade"
+OnUpdate = "Cascade"
+
+[[Migration.Operations.Field.Annotations]]
+Type = "not_null"
+
+[[Migration.Operations]]
+Type = "CreateField"
 Model = "chatroommessage"
 
 [Migration.Operations.Field]
@@ -413,246 +650,6 @@ Type = "not_null"
 [[Migration.Operations]]
 Type = "CreateField"
 Model = "chatroommessage"
-
-[Migration.Operations.Field]
-Name = "chat_room"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "chatroom"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "invite"
-
-[Migration.Operations.Field]
-Name = "from"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "invite"
-
-[Migration.Operations.Field]
-Name = "to"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "invite"
-
-[Migration.Operations.Field]
-Name = "lobby"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "lobby"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "lobbyaccount"
-
-[Migration.Operations.Field]
-Name = "lobby"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "lobby"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "lobbyaccount"
-
-[Migration.Operations.Field]
-Name = "player"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "gameaccount"
-
-[Migration.Operations.Field]
-Name = "game"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "game"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "gameaccount"
-
-[Migration.Operations.Field]
-Name = "player"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "friend"
-
-[Migration.Operations.Field]
-Name = "from"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "friend"
-
-[Migration.Operations.Field]
-Name = "to"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "friend"
-
-[Migration.Operations.Field]
-Name = "chat_room"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "chatroom"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "game"
-
-[Migration.Operations.Field]
-Name = "updated_by"
-Type = "varbinary"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "foreign_key"
-
-[Migration.Operations.Field.Annotations.Value]
-TableName = "account"
-ColumnName = "uuid"
-OnDelete = "Cascade"
-OnUpdate = "Cascade"
-
-[[Migration.Operations.Field.Annotations]]
-Type = "not_null"
-
-[[Migration.Operations]]
-Type = "CreateField"
-Model = "game"
 
 [Migration.Operations.Field]
 Name = "chat_room"

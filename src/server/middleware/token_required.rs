@@ -3,6 +3,7 @@ use std::future::{ready, Ready};
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::http::header::HeaderValue;
 use futures::future::LocalBoxFuture;
+use log::debug;
 
 use crate::server::handler::ApiError;
 
@@ -49,8 +50,12 @@ where
         let mut authenticated = false;
 
         if let Some(auth) = req.headers().get("Authorization") {
-            if auth == HeaderValue::from_str(&format!("Bearer {}", &self.token)).unwrap() {
-                authenticated = true;
+            authenticated = match HeaderValue::try_from(&format!("Bearer {}", &self.token)) {
+                Ok(v) => auth == v,
+                Err(err) => {
+                    debug!("Invalid header value: {err}");
+                    false
+                }
             }
         }
 

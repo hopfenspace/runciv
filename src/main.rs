@@ -1,8 +1,7 @@
 //! # runciv
 //!
 //! runciv is a server implementation for [unciv](https://github.com/yairm210/Unciv)
-#![warn(missing_docs, unused_imports)]
-#![warn(clippy::unwrap_used, clippy::expect_used)]
+#![warn(missing_docs, unused_imports, clippy::unwrap_used, clippy::expect_used)]
 #![cfg_attr(
     feature = "rorm-main",
     allow(dead_code, unused_variables, unused_imports)
