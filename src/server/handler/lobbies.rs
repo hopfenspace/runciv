@@ -409,7 +409,7 @@ pub async fn start_game(
 
     tx.commit().await?;
 
-    // Send notifications to all players
+    // Send notifications to all remaining players
     let msg = WsMessage::GameStarted {
         game_uuid,
         game_chat_uuid,
@@ -417,7 +417,7 @@ pub async fn start_game(
         lobby_chat_uuid: *lobby.chat_room.key(),
     };
 
-    for p in player {
+    for p in player.into_iter().filter(|x| *x == uuid) {
         if let Err(err) = ws_manager_chan
             .send(WsManagerMessage::SendMessage(p, msg.clone()))
             .await
