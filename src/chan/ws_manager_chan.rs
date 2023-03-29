@@ -4,7 +4,6 @@ use actix_toolbox::ws;
 use actix_toolbox::ws::Message;
 use log::error;
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
