@@ -11,6 +11,7 @@ use tokio::fs::{read_to_string, remove_file, write};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::Game;
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 use crate::server::RuntimeSettings;
@@ -248,12 +249,15 @@ pub async fn push_game_update(
     settings: Data<RuntimeSettings>,
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<Json<GameUploadResponse>> {
     let game_uuid = path.uuid;
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
+    let mut tx = db.start_transaction().await?;
+
     // Lookup the game and verify that the player is actually participating in it
-    let (old_data_id,) = query!(db.as_ref(), (Game::F.data_id,))
+    let mut game = query!(&mut tx, Game)
         .condition(and!(
             Game::F.uuid.equals(game_uuid.as_ref()),
             Game::F.current_players.player.uuid.equals(uuid.as_ref())
@@ -262,8 +266,20 @@ pub async fn push_game_update(
         .await?
         .ok_or(ApiError::GameNotFound)?;
 
+    // Retrieve uuids of all players from the game
+    Game::F.current_players.populate(&mut tx, &mut game).await?;
+    let players: Vec<Uuid> = if let Some(current_players) = game.current_players.cached {
+        current_players
+            .into_iter()
+            .map(|x| *x.player.key())
+            .collect()
+    } else {
+        error!("Cache of populated field current_players was empty");
+        return Err(ApiError::InternalServerError);
+    };
+
     // Increment the data identifier used to determine whether a game state has changed
-    let new_data_id = old_data_id + 1;
+    let new_data_id = game.data_id + 1;
 
     // Save a new file with the updated game state to disk
     let new_filename = format!("game_{game_uuid}_{new_data_id}.txt");
@@ -276,17 +292,34 @@ pub async fn push_game_update(
     // Update the game state identifier and last player in the database,
     // which also updates the last access time automatically
     let updated_by = uuid.to_bytes_le();
-    update!(db.as_ref(), Game)
+    update!(&mut tx, Game)
         .set(Game::F.data_id, new_data_id)
         .set(Game::F.updated_by, updated_by.as_ref())
         .condition(Game::F.uuid.equals(game_uuid.as_ref()))
         .await?;
 
+    tx.commit().await?;
+
     // Remove the old file from the filesystem
-    let old_filename = format!("game_{game_uuid}_{old_data_id}.txt");
+    let old_filename = format!("game_{game_uuid}_{old}.txt", old = game.data_id);
     let old_path = StdPath::new(&settings.game_data_path).join(&old_filename);
     if let Err(e) = remove_file(&old_path).await {
         warn!("Outdated data in '{old_filename}' could not be removed and may leak: {e}");
+    }
+
+    // Notify all remaining players about the new game data
+    let msg = WsMessage::UpdateGameData {
+        game_uuid: game.uuid,
+        game_data_id: new_data_id as u64,
+        game_data: req.game_data.clone(),
+    };
+    for player in players.into_iter().filter(|x| *x == uuid) {
+        if let Err(err) = ws_manager_chan
+            .send(WsManagerMessage::SendMessage(player, msg.clone()))
+            .await
+        {
+            error!("Could not send to ws manager chan: {err}");
+        }
     }
 
     Ok(Json(GameUploadResponse {

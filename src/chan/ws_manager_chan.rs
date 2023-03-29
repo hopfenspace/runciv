@@ -74,7 +74,7 @@ pub enum WsMessage {
         /// Identifier of the game
         game_uuid: Uuid,
         /// Data of the game
-        game_data: Box<RawValue>,
+        game_data: String,
         /// A unique counter identifying a game state, which is changed every time a
         /// [FinishedTurn] is received from the same `game_id`.
         ///
