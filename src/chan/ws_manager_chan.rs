@@ -56,12 +56,16 @@ pub enum WsMessage {
     /// This can occur, if the server can not deserialize the message, the message has a wrong
     /// type or a message, that should only be sent from the server, is received
     InvalidMessage,
-    /// This variant is sent from the client that has finished its turn
-    FinishedTurn {
+    /// The notification for the clients that a new game has started
+    GameStarted {
         /// Identifier of the game
         game_uuid: Uuid,
-        /// Data of the game
-        game_data: Box<RawValue>,
+        /// Chatroom for the game
+        game_chat_uuid: Uuid,
+        /// The lobby the game originated from
+        lobby_uuid: Uuid,
+        /// The lobby chatroom the game chat room originated from
+        lobby_chat_uuid: Uuid,
     },
     /// An update of the game data.
     ///

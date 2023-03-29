@@ -1,20 +1,23 @@
 use actix_toolbox::tb_middleware::Session;
-use actix_web::web::{Data, Json};
+use actix_web::web::{Data, Json, Path};
 use actix_web::{get, post};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use chrono::{DateTime, Utc};
+use log::error;
 use rand::thread_rng;
 use rorm::fields::{BackRef, ForeignModelByField};
-use rorm::{insert, query, Database, Model};
+use rorm::{delete, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
-    Account, ChatRoomInsert, ChatRoomMemberInsert, Lobby, LobbyAccount, LobbyInsert,
+    Account, ChatRoomInsert, ChatRoomMember, ChatRoomMemberInsert, ChatRoomMessage,
+    GameAccountInsert, GameInsert, Lobby, LobbyAccount, LobbyInsert,
 };
-use crate::server::handler::{AccountResponse, ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 
 /// A single lobby
 #[derive(Serialize, ToSchema)]
@@ -264,5 +267,168 @@ pub async fn create_lobby(
     Ok(Json(CreateLobbyResponse {
         lobby_uuid: uuid,
         lobby_chat_room_uuid: chat_room_uuid,
+    }))
+}
+
+/// The response when starting a game
+#[derive(Serialize, ToSchema)]
+pub struct StartGameResponse {
+    game_uuid: Uuid,
+    game_chat_uuid: Uuid,
+}
+
+/// Start a game from an existing lobby.
+///
+/// The executing user must be the owner of the lobby.
+///
+/// The lobby is deleted in the process, a new chatroom is created and all messages from the
+/// lobby chatroom are attached to the game chatroom.
+///
+/// This will invoke a [WsMessage::GameStarted] message that is sent via websocket to all
+/// members of the lobby to inform them which lobby was started. It also contains the the new and
+/// old chatroom uuids to make mapping for the clients easier.
+///
+/// After the game started, the lobby owner must use the `PUT /api/v2/games/{uuid}` endpoint to
+/// upload the initial game state.
+///
+/// **Note**:
+/// This behaviour is subject to change.
+/// The server should be set the order in which players are allowed to make their turns.
+/// This allows the server to detect malicious players trying to update the game state before
+/// its their turn.
+#[utoipa::path(
+    tag = "Lobbies",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Lobby got created", body = StartGameResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = []))
+)]
+#[post("/lobbies/{uuid}/start")]
+pub async fn start_game(
+    path: Path<PathUuid>,
+    db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<Json<StartGameResponse>> {
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    let mut lobby = query!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUuid)?;
+
+    Lobby::F
+        .current_player
+        .populate(&mut tx, &mut lobby)
+        .await?;
+
+    // Check if the executing user owns the lobby
+    if *lobby.owner.key() != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    // Create chatroom for the game
+    let game_chat_uuid = insert!(&mut tx, ChatRoomInsert)
+        .return_primary_key()
+        .single(&ChatRoomInsert {
+            uuid: Uuid::new_v4(),
+        })
+        .await?;
+
+    // Move messages from lobby chat to game chat
+    update!(&mut tx, ChatRoomMessage)
+        .condition(
+            ChatRoomMessage::F
+                .chat_room
+                .equals(lobby.chat_room.key().as_ref()),
+        )
+        .set(ChatRoomMessage::F.chat_room, game_chat_uuid.as_ref())
+        .exec()
+        .await?;
+
+    // Move chatroom member to new chatroom
+    update!(&mut tx, ChatRoomMember)
+        .condition(
+            ChatRoomMember::F
+                .chat_room
+                .equals(lobby.chat_room.key().as_ref()),
+        )
+        .set(ChatRoomMember::F.chat_room, game_chat_uuid.as_ref())
+        .exec()
+        .await?;
+
+    // Create new game and attach lobby chat
+    let game_uuid = insert!(&mut tx, GameInsert)
+        .return_primary_key()
+        .single(&GameInsert {
+            uuid: Uuid::new_v4(),
+            chat_room: ForeignModelByField::Key(game_chat_uuid),
+            max_players: lobby.max_player,
+            name: lobby.name,
+            updated_by: ForeignModelByField::Key(uuid),
+        })
+        .await?;
+
+    // Retrieve players from lobby
+    let player: Vec<Uuid> = if let Some(lobby_player) = lobby.current_player.cached {
+        lobby_player
+            .into_iter()
+            .map(|x: LobbyAccount| *x.player.key())
+            .collect()
+    } else {
+        error!("Cache of populated field current_player was empty");
+        return Err(ApiError::InternalServerError);
+    };
+
+    // Attach all players from lobby to game
+    insert!(&mut tx, GameAccountInsert)
+        .return_nothing()
+        .bulk(
+            &player
+                .iter()
+                .map(|x| GameAccountInsert {
+                    uuid: Uuid::new_v4(),
+                    game: ForeignModelByField::Key(game_uuid),
+                    player: ForeignModelByField::Key(*x),
+                })
+                .collect::<Vec<_>>(),
+        )
+        .await?;
+
+    // Delete lobby
+    delete!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(uuid.as_ref()))
+        .await?;
+
+    tx.commit().await?;
+
+    // Send notifications to all players
+    let msg = WsMessage::GameStarted {
+        game_uuid,
+        game_chat_uuid,
+        lobby_uuid: lobby.uuid,
+        lobby_chat_uuid: *lobby.chat_room.key(),
+    };
+
+    for p in player {
+        if let Err(err) = ws_manager_chan
+            .send(WsManagerMessage::SendMessage(p, msg.clone()))
+            .await
+        {
+            error!("Could not send to ws manager chan: {err}");
+            return Err(ApiError::InternalServerError);
+        }
+    }
+
+    Ok(Json(StartGameResponse {
+        game_uuid,
+        game_chat_uuid,
     }))
 }

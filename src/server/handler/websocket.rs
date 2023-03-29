@@ -79,26 +79,6 @@ pub async fn websocket(
         while let Some(res) = rx.recv().await {
             match res {
                 Ok(msg) => match msg {
-                    Message::Text(data) => {
-                        let message: WsMessage = match serde_json::from_str(&String::from(data)) {
-                            Ok(v) => v,
-                            Err(err) => {
-                                debug!("Could not deserialize message: {err}");
-                                invalid_msg!(rx_tx);
-                                continue;
-                            }
-                        };
-
-                        match message {
-                            WsMessage::FinishedTurn {
-                                game_uuid,
-                                game_data,
-                            } => {
-                                debug!("Received Finished turn: {game_uuid}: {game_data}");
-                            }
-                            _ => invalid_msg!(rx_tx),
-                        }
-                    }
                     Message::Ping(req) => send_to_ws!(rx_tx, Message::Pong(req)),
                     Message::Pong(_) => {
                         let mut r = last_hb.lock().await;
