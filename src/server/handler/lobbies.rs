@@ -169,7 +169,7 @@ pub struct CreateLobbyResponse {
 /// `max_players` must be between 2 and 34 (inclusive).
 /// If `password` is an empty string, an error is returned.
 ///
-/// You are placed in
+/// You are placed in the lobby and in the corresponding chatroom
 #[utoipa::path(
     tag = "Lobbies",
     context_path = "/api/v2",
