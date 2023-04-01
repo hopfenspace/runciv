@@ -346,7 +346,9 @@ pub async fn delete_friend(
         return Err(ApiError::MissingPrivileges);
     }
 
-    rorm::delete!(&mut tx, Friend).single(&f).await?;
+    rorm::delete!(&mut tx, Friend)
+        .condition(Friend::F.uuid.equals(f.uuid.as_ref()))
+        .await?;
 
     tx.commit().await?;
 
@@ -414,6 +416,7 @@ pub async fn accept_friend_request(
         .await?;
 
     update!(&mut tx, Friend)
+        .condition(Friend::F.uuid.equals(path.uuid.as_ref()))
         .set(Friend::F.is_request, false)
         .set(Friend::F.chat_room, Some(chat_room_uuid.as_ref()))
         .exec()
