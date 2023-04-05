@@ -402,6 +402,16 @@ pub async fn start_game(
         )
         .await?;
 
+    // Attack owner
+    insert!(&mut tx, GameAccountInsert)
+        .return_nothing()
+        .single(&GameAccountInsert {
+            uuid: Uuid::new_v4(),
+            game: ForeignModelByField::Key(game_uuid),
+            player: ForeignModelByField::Key(*lobby.owner.key()),
+        })
+        .await?;
+
     // Delete lobby
     delete!(&mut tx, Lobby)
         .condition(Lobby::F.uuid.equals(uuid.as_ref()))
