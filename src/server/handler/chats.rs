@@ -255,6 +255,7 @@ pub struct SendMessageRequest {
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
+    params(PathUuid),
     request_body = SendMessageRequest,
     security(("session_cookie" = []))
 )]
