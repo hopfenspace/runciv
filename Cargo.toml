@@ -36,7 +36,7 @@ serde_repr = { version = "~0.1" }
 serde_json = { version = "~1", features = ["raw_value"] }
 toml = { version = "~0.7" }
 # Time library
-chrono = { version = ">=0.4.20", features = ["serde"] }
+chrono = { version = ">=0.4.20", default-features = false, features = ["serde"] }
 # Bytes abstractions for network usage
 bytes = { version = "~1" }
 # Wrapper for string with bytes as storage

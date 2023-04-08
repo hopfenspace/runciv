@@ -402,7 +402,7 @@ pub async fn start_game(
         )
         .await?;
 
-    // Attack owner
+    // Attach owner
     insert!(&mut tx, GameAccountInsert)
         .return_nothing()
         .single(&GameAccountInsert {

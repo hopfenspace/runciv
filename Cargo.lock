@@ -993,13 +993,13 @@ dependencies = [
 
 [[package]]
 name = "errno"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50d6a0976c999d473fe89ad888d5a284e55366d9dc9038b1ba2aa15128c4afa0"
+checksum = "4bcfec3a70f97c962c307b2d2c56e358cf1d00b558d74262b5f929ee8cc7e73a"
 dependencies = [
  "errno-dragonfly",
  "libc",
- "windows-sys 0.45.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -1167,9 +1167,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
+checksum = "c85e1d9ab2eadba7e5040d4e09cbd6d072b76a557ad64e797c2cb9d4da21d7e4"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1382,14 +1382,14 @@ dependencies = [
 
 [[package]]
 name = "is-terminal"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256017f749ab3117e93acb91063009e1f1bb56d03965b14c2c8df4eb02c524d8"
+checksum = "adcf93614601c8129ddf72e2d5633df827ba6551541c6d8c59520a371475be1f"
 dependencies = [
  "hermit-abi 0.3.1",
  "io-lifetimes",
  "rustix",
- "windows-sys 0.45.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2050,9 +2050,9 @@ dependencies = [
 
 [[package]]
 name = "rorm"
-version = "0.5.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "029faca1447a051da518a8d3840f112329780ac17708e14d258f6e869b06420c"
+checksum = "d9a6bbee31206b1e7c4dc86b31b491162d5e3595dd7be0d234ad2f8248f71720"
 dependencies = [
  "chrono",
  "futures",
@@ -2070,9 +2070,9 @@ dependencies = [
 
 [[package]]
 name = "rorm-cli"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ac867719ead7f6372e45faaed0bee1772d43256cb8da8a8245958f06e75fb9b"
+checksum = "c8293f6560be934927037acbd78472e02de52cd2ce1c1131e249296540575bd7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2085,7 +2085,6 @@ dependencies = [
  "serde_json",
  "sqlx",
  "strum",
- "tokio",
  "toml",
 ]
 
@@ -2131,13 +2130,14 @@ dependencies = [
 
 [[package]]
 name = "rorm-sql"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b2a9cf133dc9d9a77f5e8adab56ca2a772f050693e34896b6b81f4e0a6a5d05"
+checksum = "f246e637bb4566dfd82446625344a69c8c369d013716833a61b897b03cff5e56"
 dependencies = [
  "chrono",
  "libsqlite3-sys",
  "rorm-declaration",
+ "rustc_version",
 ]
 
 [[package]]
@@ -2256,16 +2256,16 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.37.7"
+version = "0.37.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aae838e49b3d63e9274e1c01833cc8139d3fec468c3b84688c628f44b1ae11d"
+checksum = "85597d61f83914ddeba6a47b3b8ffe7365107221c2e557ed94426489fefb5f77"
 dependencies = [
  "bitflags",
  "errno",
  "io-lifetimes",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.45.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

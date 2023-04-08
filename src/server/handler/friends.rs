@@ -290,11 +290,11 @@ pub async fn create_friend_request(
         .optional()
         .await?
     {
-        if friendship.is_request {
-            return Err(ApiError::FriendshipAlreadyRequested);
+        return if friendship.is_request {
+            Err(ApiError::FriendshipAlreadyRequested)
         } else {
-            return Err(ApiError::AlreadyFriends);
-        }
+            Err(ApiError::AlreadyFriends)
+        };
     }
 
     // Create new friendship request
