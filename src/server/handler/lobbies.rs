@@ -1,21 +1,24 @@
+use std::iter;
+
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
-use actix_web::{get, post};
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use actix_web::{get, post, HttpResponse};
+use argon2::password_hash::{Error, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Utc};
-use log::error;
+use log::{error, warn};
 use rand::thread_rng;
 use rorm::fields::{BackRef, ForeignModelByField};
 use rorm::{delete, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
     Account, ChatRoomInsert, ChatRoomMember, ChatRoomMemberInsert, ChatRoomMessage,
-    GameAccountInsert, GameInsert, Lobby, LobbyAccount, LobbyInsert,
+    GameAccountInsert, GameInsert, Lobby, LobbyAccount, LobbyAccountInsert, LobbyInsert,
 };
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 
@@ -441,4 +444,170 @@ pub async fn start_game(
         game_uuid,
         game_chat_uuid,
     }))
+}
+
+/// The request to join a lobby
+#[derive(Deserialize, ToSchema)]
+pub struct JoinLobbyRequest {
+    password: Option<String>,
+}
+
+/// Join an existing lobby
+///
+/// The executing user must not be the owner of a lobby or member of a lobby.
+/// To be placed in a lobby, a active websocket connection is required.
+///
+/// As a lobby might be protected by password, the optional parameter `password` may be specified.
+/// If the provided password was incorrect, the error [ApiError::MissingPrivileges] is returned.
+/// If the lobby isn't protected, but a password was found in the request, it is ignored.
+///
+/// If the lobby is already full, a [ApiError::LobbyFull] error is returned.
+///
+/// On success, all players that were in the lobby before, are notified about the new player with a
+/// [WsMessage::LobbyJoin] message.
+#[utoipa::path(
+    tag = "Lobbies",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Joined lobby successfully"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = []))
+)]
+#[post("/lobbies/{uuid}/join")]
+pub async fn join_lobby(
+    path: Path<PathUuid>,
+    req: Json<JoinLobbyRequest>,
+    db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    // Check if lobby exists
+    let mut lobby = query!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidLobbyUuid)?;
+
+    Lobby::F
+        .current_player
+        .populate(&mut tx, &mut lobby)
+        .await?;
+
+    // Ok as current_player is populated before
+    #[allow(clippy::unwrap_used)]
+    let current_player: Vec<LobbyAccount> = lobby.current_player.cached.unwrap();
+
+    // Check if the lobby is already full
+
+    if lobby.max_player as usize == current_player.len() + 1 {
+        return Err(ApiError::LobbyFull);
+    }
+
+    // Check if the executing account is already in a lobby
+    if query!(&mut tx, (LobbyAccount::F.uuid,))
+        .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
+        .optional()
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::AlreadyInALobby);
+    }
+
+    if query!(&mut tx, (Lobby::F.uuid,))
+        .condition(Lobby::F.owner.equals(uuid.as_ref()))
+        .optional()
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::AlreadyInALobby);
+    }
+
+    // If the lobby is password protected, check the hash
+    if let Some(password_hash) = lobby.password_hash {
+        let req_pw = req.password.clone().ok_or(ApiError::MissingPrivileges)?;
+        Argon2::default()
+            .verify_password(req_pw.as_bytes(), &PasswordHash::new(&password_hash)?)
+            .map_err(|e| match e {
+                Error::Password => ApiError::MissingPrivileges,
+                _ => ApiError::InvalidHash(e),
+            })?;
+    }
+
+    // Check if the websocket is connected
+    let (sender, rx) = oneshot::channel();
+
+    let msg = WsManagerMessage::RetrieveOnlineState(uuid, sender);
+    if let Err(err) = ws_manager_chan.send(msg).await {
+        warn!("Could not send to ws manager chan: {err}");
+        return Err(ApiError::InternalServerError);
+    }
+
+    match rx.await {
+        Ok(is_online) => {
+            if !is_online {
+                return Err(ApiError::WsNotConnected);
+            }
+        }
+        Err(err) => {
+            warn!("Error while receiving from oneshot channel: {err}");
+            return Err(ApiError::InternalServerError);
+        }
+    }
+
+    // Add player to lobby
+    insert!(&mut tx, LobbyAccountInsert)
+        .return_nothing()
+        .single(&LobbyAccountInsert {
+            uuid: Uuid::new_v4(),
+            lobby: ForeignModelByField::Key(lobby.uuid),
+            player: ForeignModelByField::Key(uuid),
+        })
+        .await?;
+
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
+    tx.commit().await?;
+
+    let players: Vec<Uuid> = iter::once(*lobby.owner.key())
+        .chain(current_player.into_iter().map(|x| *x.player.key()))
+        .collect();
+
+    let msg = WsMessage::LobbyJoin {
+        lobby_uuid: lobby.uuid,
+        player: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+    };
+
+    // Notify other players
+    for player in players {
+        if let Err(err) = ws_manager_chan
+            .send(WsManagerMessage::SendMessage(player, msg.clone()))
+            .await
+        {
+            warn!("Could not send to ws manager chan: {err}");
+        }
+    }
+
+    Ok(HttpResponse::Ok().finish())
 }

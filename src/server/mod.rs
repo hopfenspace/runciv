@@ -24,9 +24,9 @@ use crate::server::error::StartServerError;
 use crate::server::handler::{
     accept_friend_request, create_friend_request, create_invite, create_lobby, delete_friend,
     delete_me, get_all_chats, get_chat, get_friends, get_game, get_invites, get_lobbies, get_me,
-    get_open_games, health, login, logout, lookup_account_by_username, lookup_account_by_uuid,
-    push_game_update, register_account, send_message, set_password, start_game, update_me, version,
-    websocket, welcome_page,
+    get_open_games, health, join_lobby, login, logout, lookup_account_by_username,
+    lookup_account_by_uuid, push_game_update, register_account, send_message, set_password,
+    start_game, update_me, version, websocket, welcome_page,
 };
 use crate::server::middleware::{
     handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
@@ -127,6 +127,7 @@ pub async fn start_server(
                     .service(delete_friend)
                     .service(get_lobbies)
                     .service(create_lobby)
+                    .service(join_lobby)
                     .service(get_chat)
                     .service(get_all_chats)
                     .service(send_message)

@@ -110,6 +110,13 @@ pub enum WsMessage {
         /// The lobby to join
         lobby_uuid: Uuid,
     },
+    /// A new player joined the lobby
+    LobbyJoin {
+        /// The lobby that was joined
+        lobby_uuid: Uuid,
+        /// The player that joined in the lobby
+        player: AccountResponse,
+    },
 }
 
 /// This type is a sender to the websocket manager
@@ -132,7 +139,12 @@ pub enum WsManagerMessage {
     /// message to the ws manager
     ///
     /// It will respond through the provided channel.
-    RetrieveOnlineState(Vec<Uuid>, oneshot::Sender<Vec<bool>>),
+    RetrieveOnlineStates(Vec<Uuid>, oneshot::Sender<Vec<bool>>),
+    /// Retrieve the online state of the single account by sending this
+    /// message to the ws manager
+    ///
+    /// It will respond through the provided channel.
+    RetrieveOnlineState(Uuid, oneshot::Sender<bool>),
 }
 
 /// Start the websocket manager
@@ -188,13 +200,18 @@ pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
                         error!("Could not send through callback channel");
                     }
                 }
-                WsManagerMessage::RetrieveOnlineState(accounts, tx) => {
+                WsManagerMessage::RetrieveOnlineStates(accounts, tx) => {
                     let online_state = accounts
                         .into_iter()
                         .map(|a| lookup.contains_key(&a))
                         .collect();
 
                     if tx.send(online_state).is_err() {
+                        error!("Could not send through callback channel");
+                    }
+                }
+                WsManagerMessage::RetrieveOnlineState(account, tx) => {
+                    if tx.send(lookup.contains_key(&account)).is_err() {
                         error!("Could not send through callback channel");
                     }
                 }

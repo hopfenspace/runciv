@@ -96,7 +96,7 @@ pub async fn get_friends(
     let (oneshot_tx, oneshot_rx) = oneshot::channel();
     let online_state = tokio::spawn(async move { oneshot_rx.await });
     if let Err(err) = ws_manager_chan
-        .send(WsManagerMessage::RetrieveOnlineState(
+        .send(WsManagerMessage::RetrieveOnlineStates(
             friends_raw.iter().map(|raw| raw.1).collect(),
             oneshot_tx,
         ))

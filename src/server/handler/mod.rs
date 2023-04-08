@@ -74,6 +74,8 @@ pub(crate) enum ApiStatusCode {
     InvalidFriendUuid = 1018,
     GameNotFound = 1019,
     InvalidMessage = 1020,
+    WsNotConnected = 1021,
+    LobbyFull = 1022,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -148,6 +150,10 @@ pub enum ApiError {
     GameNotFound,
     /// An invalid message was received
     InvalidMessage,
+    /// The websocket was not connected, but required for this action
+    WsNotConnected,
+    /// The lobby is full
+    LobbyFull,
 
     /// Unknown error occurred
     InternalServerError,
@@ -197,6 +203,11 @@ impl Display for ApiError {
             ApiError::InvalidFriendState => write!(f, "Invalid friend state"),
             ApiError::GameNotFound => write!(f, "The game was not found on the server"),
             ApiError::InvalidMessage => write!(f, "Invalid message"),
+            ApiError::WsNotConnected => write!(
+                f,
+                "The websocket was not connected, but required for this action"
+            ),
+            ApiError::LobbyFull => write!(f, "The lobby is full"),
         }
     }
 }
@@ -380,6 +391,18 @@ impl actix_web::ResponseError for ApiError {
             )),
             ApiError::InvalidMessage => HttpResponse::BadRequest().json(ApiErrorResponse::new(
                 ApiStatusCode::InvalidMessage,
+                self.to_string(),
+            )),
+            ApiError::WsNotConnected => {
+                debug!("Websocket was not connected, but required for this action");
+
+                HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                    ApiStatusCode::WsNotConnected,
+                    self.to_string(),
+                ))
+            }
+            ApiError::LobbyFull => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::LobbyFull,
                 self.to_string(),
             )),
         }
