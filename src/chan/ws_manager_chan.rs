@@ -40,6 +40,18 @@ pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMes
     }
 }
 
+/// All events that can happen in a friendship
+#[derive(Deserialize, Serialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum FriendshipEvent {
+    /// A friendship request was accepted
+    Accepted,
+    /// A friendship was rejected
+    Rejected,
+    /// A friendship was deleted
+    Deleted,
+}
+
 /// Message that is sent via websocket
 ///
 /// The messages will get serialized and deserialized using JSON
@@ -114,6 +126,13 @@ pub enum WsMessage {
     IncomingFriendRequest {
         /// The user that invoked the request
         from: AccountResponse,
+    },
+    /// A friendship was modified
+    FriendshipChanged {
+        /// The friend that changed the friendship
+        friend: AccountResponse,
+        /// The event type
+        event: FriendshipEvent,
     },
     /// A new player joined the lobby
     LobbyJoin {

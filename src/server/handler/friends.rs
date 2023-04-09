@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
+use crate::chan::{FriendshipEvent, WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
     Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert, FriendWithChatInsert,
 };
@@ -360,6 +360,7 @@ pub async fn delete_friend(
     path: Path<PathUuid>,
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
@@ -381,7 +382,47 @@ pub async fn delete_friend(
         .condition(Friend::F.uuid.equals(f.uuid.as_ref()))
         .await?;
 
+    let other_party = if *f.from.key() == uuid {
+        *f.to.key()
+    } else {
+        *f.from.key()
+    };
+
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(other_party.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
     tx.commit().await?;
+
+    // Notify other party about either the deleted or rejected friendship
+    let msg = WsMessage::FriendshipChanged {
+        friend: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+        event: if f.is_request {
+            FriendshipEvent::Rejected
+        } else {
+            FriendshipEvent::Deleted
+        },
+    };
+
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::SendMessage(other_party, msg))
+        .await
+    {
+        warn!("Could not send to ws manager chan: {err}");
+    }
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -401,8 +442,9 @@ pub async fn delete_friend(
 #[put("/friends/{uuid}")]
 pub async fn accept_friend_request(
     path: Path<PathUuid>,
-    session: Session,
     db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
@@ -418,8 +460,8 @@ pub async fn accept_friend_request(
         .await?
         .ok_or(ApiError::InvalidUuid)?;
 
-    // If executing user is neither from nor to, return permission denied
-    if *f.from.key() != uuid && *f.to.key() != uuid {
+    // If executing user is not to, return permission denied
+    if *f.to.key() != uuid {
         return Err(ApiError::MissingPrivileges);
     }
 
@@ -463,7 +505,37 @@ pub async fn accept_friend_request(
         })
         .await?;
 
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(f.to.key().as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
     tx.commit().await?;
+
+    let msg = WsMessage::FriendshipChanged {
+        friend: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+        event: FriendshipEvent::Accepted,
+    };
+
+    // Notify other party about accepted friendship
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::SendMessage(uuid, msg))
+        .await
+    {
+        warn!("Could not send to ws manager chan: {err}");
+    }
 
     Ok(HttpResponse::Ok().finish())
 }
