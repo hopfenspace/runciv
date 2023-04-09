@@ -127,6 +127,13 @@ pub enum WsMessage {
         /// The uuid of the lobby
         lobby_uuid: Uuid,
     },
+    /// A player has left the lobby
+    LobbyLeave {
+        /// The lobby
+        lobby_uuid: Uuid,
+        /// The player that has left the lobby
+        player: AccountResponse,
+    },
     /// The user account was updated.
     ///
     /// This might me especially useful for reflecting changes in the username, etc. in the

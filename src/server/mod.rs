@@ -24,8 +24,8 @@ use crate::server::error::StartServerError;
 use crate::server::handler::{
     accept_friend_request, close_lobby, create_friend_request, create_invite, create_lobby,
     delete_friend, delete_invite, delete_me, get_all_chats, get_chat, get_friends, get_game,
-    get_invites, get_lobbies, get_me, get_open_games, health, join_lobby, login, logout,
-    lookup_account_by_username, lookup_account_by_uuid, push_game_update, register_account,
+    get_invites, get_lobbies, get_me, get_open_games, health, join_lobby, leave_lobby, login,
+    logout, lookup_account_by_username, lookup_account_by_uuid, push_game_update, register_account,
     send_message, set_password, start_game, update_me, version, websocket, welcome_page,
 };
 use crate::server::middleware::{
@@ -128,6 +128,7 @@ pub async fn start_server(
                     .service(get_lobbies)
                     .service(create_lobby)
                     .service(join_lobby)
+                    .service(leave_lobby)
                     .service(close_lobby)
                     .service(get_chat)
                     .service(get_all_chats)
