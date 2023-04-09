@@ -474,6 +474,7 @@ pub struct JoinLobbyRequest {
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
     params(PathUuid),
+    request_body = JoinLobbyRequest,
     security(("session_cookie" = []))
 )]
 #[post("/lobbies/{uuid}/join")]
