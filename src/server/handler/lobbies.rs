@@ -2,14 +2,14 @@ use std::iter;
 
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
-use actix_web::{get, post, HttpResponse};
+use actix_web::{delete, get, post, HttpResponse};
 use argon2::password_hash::{Error, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Utc};
 use log::{error, warn};
 use rand::thread_rng;
 use rorm::fields::{BackRef, ForeignModelByField};
-use rorm::{delete, insert, query, update, Database, Model};
+use rorm::{insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use utoipa::ToSchema;
@@ -416,7 +416,7 @@ pub async fn start_game(
         .await?;
 
     // Delete lobby
-    delete!(&mut tx, Lobby)
+    rorm::delete!(&mut tx, Lobby)
         .condition(Lobby::F.uuid.equals(uuid.as_ref()))
         .await?;
 
@@ -449,6 +449,7 @@ pub async fn start_game(
 /// The request to join a lobby
 #[derive(Deserialize, ToSchema)]
 pub struct JoinLobbyRequest {
+    #[schema(example = "super-secure-password")]
     password: Option<String>,
 }
 
@@ -607,6 +608,77 @@ pub async fn join_lobby(
             .await
         {
             warn!("Could not send to ws manager chan: {err}");
+        }
+    }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Close an open lobby
+///
+/// This endpoint can only be used by the lobby owner.
+///
+/// On success, all joined players will receive a [WsMessage::LobbyClosed] message via websocket.
+#[utoipa::path(
+    tag = "Lobbies",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Lobby closed"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = []))
+)]
+#[delete("/lobbies/{uuid}")]
+pub async fn close_lobby(
+    path: Path<PathUuid>,
+    db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    // Check if lobby exists
+    let mut lobby = query!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUuid)?;
+
+    Lobby::F
+        .current_player
+        .populate(&mut tx, &mut lobby)
+        .await?;
+
+    // Ok as current_player is populated before
+    #[allow(clippy::unwrap_used)]
+    let current_player: Vec<LobbyAccount> = lobby.current_player.cached.unwrap();
+
+    // Check if user has the privileges to close the lobby
+    if *lobby.owner.key() != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    rorm::delete!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(lobby.uuid.as_ref()))
+        .await?;
+
+    tx.commit().await?;
+
+    let msg = WsMessage::LobbyClosed {
+        lobby_uuid: lobby.uuid,
+    };
+
+    // Notify other players
+    for player in current_player.into_iter().map(|x| *x.player.key()) {
+        if let Err(err) = ws_manager_chan
+            .send(WsManagerMessage::SendMessage(player, msg.clone()))
+            .await
+        {
+            warn!("Error while sending message to ws manager chan: {err}");
         }
     }
 

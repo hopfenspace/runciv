@@ -122,6 +122,11 @@ pub enum WsMessage {
         /// The player that joined in the lobby
         player: AccountResponse,
     },
+    /// A lobby closed in which the client was part of
+    LobbyClosed {
+        /// The uuid of the lobby
+        lobby_uuid: Uuid,
+    },
     /// The user account was updated.
     ///
     /// This might me especially useful for reflecting changes in the username, etc. in the

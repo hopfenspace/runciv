@@ -50,6 +50,7 @@ impl Modify for CookieSecurity {
         handler::send_message,
         handler::join_lobby,
         handler::delete_invite,
+        handler::close_lobby,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
