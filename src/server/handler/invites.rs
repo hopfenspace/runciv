@@ -1,6 +1,6 @@
 use actix_toolbox::tb_middleware::Session;
-use actix_web::web::{Data, Json};
-use actix_web::{get, post, HttpResponse};
+use actix_web::web::{Data, Json, Path};
+use actix_web::{delete, get, post, HttpResponse};
 use chrono::{DateTime, Utc};
 use log::error;
 use rorm::fields::ForeignModelByField;
@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{Account, Friend, Invite, InviteInsert, Lobby, LobbyAccount};
-use crate::server::handler::{AccountResponse, ApiError, ApiResult};
+use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 
 /// The request to invite a friend into a lobby
 #[derive(Deserialize, ToSchema)]
@@ -190,4 +190,47 @@ pub async fn get_invites(
             )
             .collect(),
     }))
+}
+
+/// Reject or retract an invite to a lobby
+///
+/// This endpoint can be used either by the sender of the invite to retract the invite or
+/// by the receiver to reject the invite.
+#[utoipa::path(
+    tag = "Invites",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Invite was rejected"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = []))
+)]
+#[delete("/invites/{uuid}")]
+pub async fn delete_invite(
+    path: Path<PathUuid>,
+    db: Data<Database>,
+    session: Session,
+) -> ApiResult<HttpResponse> {
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    let invite = query!(&mut tx, Invite)
+        .condition(Invite::F.uuid.equals(path.uuid.as_ref()))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUuid)?;
+
+    // Check if the executing user has the privileges to delete the invite
+    if *invite.to.key() != uuid && *invite.from.key() != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    rorm::delete!(&mut tx, Invite).single(&invite).await?;
+
+    tx.commit().await?;
+
+    Ok(HttpResponse::Ok().finish())
 }
