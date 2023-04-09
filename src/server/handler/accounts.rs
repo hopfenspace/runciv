@@ -5,14 +5,14 @@ use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
 use argon2::password_hash::{Error, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use log::error;
+use log::{error, warn};
 use rand::thread_rng;
 use rorm::{insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::chan::{WsManagerChan, WsManagerMessage};
+use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{Account, AccountInsert};
 use crate::server::handler::{ApiError, ApiResult, PathUuid};
 
@@ -248,6 +248,9 @@ pub struct UpdateAccountRequest {
 /// Updates the currently logged-in account
 ///
 /// All parameter are optional, but at least one of them is required.
+///
+/// On success, a [WsMessage::AccountUpdated] message is sent via websocket to the own user.
+/// This is done to reflect account changes in multi-device circumstances.
 #[utoipa::path(
     tag = "Accounts",
     context_path = "/api/v2",
@@ -264,6 +267,7 @@ pub async fn update_me(
     req: Json<UpdateAccountRequest>,
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
@@ -300,7 +304,36 @@ pub async fn update_me(
         .exec()
         .await?;
 
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
     tx.commit().await?;
+
+    // Notify client via websocket about new account data
+    let msg = WsMessage::AccountUpdated {
+        account: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+    };
+
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::SendMessage(uuid, msg))
+        .await
+    {
+        warn!("Could not send to ws manager chan: {err}");
+    }
 
     Ok(HttpResponse::Ok().finish())
 }
