@@ -134,6 +134,15 @@ pub enum WsMessage {
         /// The player that has left the lobby
         player: AccountResponse,
     },
+    /// A player was kicked out of the lobby.
+    ///
+    /// Make sure to check the player if you were kicked ^^
+    LobbyKick {
+        /// The lobby
+        lobby_uuid: Uuid,
+        /// The player that has left the lobby
+        player: AccountResponse,
+    },
     /// The user account was updated.
     ///
     /// This might me especially useful for reflecting changes in the username, etc. in the

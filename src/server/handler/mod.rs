@@ -76,6 +76,7 @@ pub(crate) enum ApiStatusCode {
     InvalidMessage = 1020,
     WsNotConnected = 1021,
     LobbyFull = 1022,
+    InvalidPlayerUuid = 1023,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -154,6 +155,8 @@ pub enum ApiError {
     WsNotConnected,
     /// The lobby is full
     LobbyFull,
+    /// The provided player uuid was not valid
+    InvalidPlayerUuid,
 
     /// Unknown error occurred
     InternalServerError,
@@ -208,6 +211,7 @@ impl Display for ApiError {
                 "The websocket was not connected, but required for this action"
             ),
             ApiError::LobbyFull => write!(f, "The lobby is full"),
+            ApiError::InvalidPlayerUuid => write!(f, "Invalid player uuid was specified"),
         }
     }
 }
@@ -403,6 +407,10 @@ impl actix_web::ResponseError for ApiError {
             }
             ApiError::LobbyFull => HttpResponse::BadRequest().json(ApiErrorResponse::new(
                 ApiStatusCode::LobbyFull,
+                self.to_string(),
+            )),
+            ApiError::InvalidPlayerUuid => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::InvalidPlayerUuid,
                 self.to_string(),
             )),
         }

@@ -52,6 +52,7 @@ impl Modify for CookieSecurity {
         handler::delete_invite,
         handler::close_lobby,
         handler::leave_lobby,
+        handler::kick_player_from_lobby,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,

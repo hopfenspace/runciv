@@ -12,7 +12,7 @@ use rorm::fields::{BackRef, ForeignModelByField};
 use rorm::{and, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
@@ -696,7 +696,7 @@ pub async fn close_lobby(
     tag = "Lobbies",
     context_path = "/api/v2",
     responses(
-        (status = 200, description = "Lobby left"),
+        (status = 200, description = "Left the lobby"),
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
@@ -770,6 +770,114 @@ pub async fn leave_lobby(
 
     // Notify other players
     for player in players {
+        if let Err(err) = ws_manager_chan
+            .send(WsManagerMessage::SendMessage(player, msg.clone()))
+            .await
+        {
+            warn!("Error while sending message to ws manager chan: {err}");
+        }
+    }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// The path parameter to kick a player
+#[derive(Deserialize, IntoParams)]
+pub struct PlayerKickPath {
+    lobby_uuid: Uuid,
+    player_uuid: Uuid,
+}
+
+/// Kick a player from an open lobby
+///
+/// This endpoint can only be used by the lobby owner.
+///
+/// All players in the lobby as well as the kick player will receive a [WsMessage::LobbyKick]
+/// message via websocket on success.
+#[utoipa::path(
+    tag = "Lobbies",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Player was kicked"),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PlayerKickPath),
+    security(("session_cookie" = []))
+)]
+#[delete("/lobbies/{lobby_uuid}/{player_uuid}")]
+pub async fn kick_player_from_lobby(
+    path: Path<PlayerKickPath>,
+    db: Data<Database>,
+    session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
+) -> ApiResult<HttpResponse> {
+    let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
+
+    let mut tx = db.start_transaction().await?;
+
+    // Check if lobby exists
+    let mut lobby = query!(&mut tx, Lobby)
+        .condition(Lobby::F.uuid.equals(path.lobby_uuid.as_ref()))
+        .optional()
+        .await?
+        .ok_or(ApiError::InvalidUuid)?;
+
+    Lobby::F
+        .current_player
+        .populate(&mut tx, &mut lobby)
+        .await?;
+
+    // Ok as current_player is populated before
+    #[allow(clippy::unwrap_used)]
+    let current_player: Vec<LobbyAccount> = lobby.current_player.cached.unwrap();
+
+    // Check if executing user owns the lobby
+    if *lobby.owner.key() != uuid {
+        return Err(ApiError::MissingPrivileges);
+    }
+
+    // Check if the user to kick is in the lobby
+    if !current_player
+        .iter()
+        .any(|x| *x.player.key() == path.player_uuid)
+    {
+        return Err(ApiError::InvalidPlayerUuid);
+    }
+
+    rorm::delete!(&mut tx, LobbyAccount)
+        .condition(and!(
+            LobbyAccount::F.lobby.equals(lobby.uuid.as_ref()),
+            LobbyAccount::F.player.equals(path.player_uuid.as_ref())
+        ))
+        .await?;
+
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(path.player_uuid.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
+    tx.commit().await?;
+
+    let msg = WsMessage::LobbyKick {
+        lobby_uuid: lobby.uuid,
+        player: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+    };
+
+    // Notify joined players and kicked player
+    for player in current_player.into_iter().map(|x| *x.player.key()) {
         if let Err(err) = ws_manager_chan
             .send(WsManagerMessage::SendMessage(player, msg.clone()))
             .await
