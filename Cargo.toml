@@ -2,7 +2,7 @@
 name = "runciv"
 version = "0.1.0"
 edition = "2021"
-authors = ["Niklas Pfister <git@omikron.dev>", "gammelalf"]
+authors = ["Niklas Pfister <git@omikron.dev>", "CrsiX"]
 license = "AGPL-3.0"
 repository = "https://github.com/hopfenspace/runciv"
 
