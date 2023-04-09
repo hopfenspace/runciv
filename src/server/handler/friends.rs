@@ -1,7 +1,7 @@
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
-use log::error;
+use log::{error, warn};
 use rorm::fields::ForeignModelByField;
 use rorm::{and, insert, or, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::chan::{WsManagerChan, WsManagerMessage};
+use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
     Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert, FriendWithChatInsert,
 };
@@ -247,6 +247,8 @@ pub struct CreateFriendRequest {
 }
 
 /// Create a new friend request
+///
+/// The other party is notified via a [WsMessage::IncomingFriendRequest]
 #[utoipa::path(
     tag = "Friends",
     context_path = "/api/v2",
@@ -263,6 +265,7 @@ pub async fn create_friend_request(
     req: Json<CreateFriendRequest>,
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<HttpResponse> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
@@ -307,7 +310,35 @@ pub async fn create_friend_request(
         })
         .await?;
 
+    let (uuid, username, display_name) = query!(
+        &mut tx,
+        (
+            Account::F.uuid,
+            Account::F.username,
+            Account::F.display_name
+        )
+    )
+    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::SessionCorrupt)?;
+
     tx.commit().await?;
+
+    // Notify other party about friend request
+    let msg = WsMessage::IncomingFriendRequest {
+        from: AccountResponse {
+            uuid,
+            username,
+            display_name,
+        },
+    };
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::SendMessage(target.uuid, msg))
+        .await
+    {
+        warn!("Could not send to ws manager chan: {err}");
+    }
 
     Ok(HttpResponse::Ok().finish())
 }

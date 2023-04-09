@@ -110,6 +110,11 @@ pub enum WsMessage {
         /// The lobby to join
         lobby_uuid: Uuid,
     },
+    /// A friend request is sent to the client
+    IncomingFriendRequest {
+        /// The user that invoked the request
+        from: AccountResponse,
+    },
     /// A new player joined the lobby
     LobbyJoin {
         /// The lobby that was joined
