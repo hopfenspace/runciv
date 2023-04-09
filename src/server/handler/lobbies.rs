@@ -494,7 +494,7 @@ pub async fn join_lobby(
         .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
         .optional()
         .await?
-        .ok_or(ApiError::InvalidLobbyUuid)?;
+        .ok_or(ApiError::InvalidUuid)?;
 
     Lobby::F
         .current_player
