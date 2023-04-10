@@ -35,7 +35,7 @@ impl Modify for CookieSecurity {
         handler::accept_friend_request,
         handler::get_friends,
         handler::delete_friend,
-        handler::get_lobbies,
+        handler::get_lobby,
         handler::create_lobby,
         handler::lookup_account_by_uuid,
         handler::lookup_account_by_username,
@@ -53,6 +53,7 @@ impl Modify for CookieSecurity {
         handler::close_lobby,
         handler::leave_lobby,
         handler::kick_player_from_lobby,
+        handler::get_lobby,
     ),
     components(schemas(
         handler::AccountRegistrationRequest,
@@ -88,6 +89,7 @@ impl Modify for CookieSecurity {
         handler::StartGameResponse,
         handler::SendMessageRequest,
         handler::JoinLobbyRequest,
+        handler::GetLobbyResponse
     )),
     modifiers(&CookieSecurity)
 )]

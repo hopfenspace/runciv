@@ -58,7 +58,7 @@ pub struct GetLobbiesResponse {
     security(("session_cookie" = []))
 )]
 #[get("/lobbies")]
-pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesResponse>> {
+pub async fn get_all_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesResponse>> {
     let mut tx = db.start_transaction().await?;
 
     let lobbies = query!(
@@ -72,7 +72,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
             Lobby::F.created_at,
             Lobby::F.max_player,
             Lobby::F.password_hash,
-            Lobby::F.chat_room.uuid,
+            Lobby::F.chat_room,
         )
     )
     .all()
@@ -106,7 +106,7 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 created_at,
                 max_player,
                 password_hash,
-                chat_room: ForeignModelByField::Key(chat_room_uuid),
+                chat_room: ForeignModelByField::Key(*chat_room_uuid.key()),
             },
         )
         .collect();
@@ -141,6 +141,110 @@ pub async fn get_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRespons
                 }
             })
             .collect(),
+    }))
+}
+
+/// A single lobby
+#[derive(Serialize, ToSchema)]
+pub struct GetLobbyResponse {
+    uuid: Uuid,
+    #[schema(example = "Herbert's lobby")]
+    name: String,
+    #[schema(example = 4)]
+    max_players: u8,
+    created_at: DateTime<Utc>,
+    password: bool,
+    owner: AccountResponse,
+    current_players: Vec<AccountResponse>,
+    chat_room_uuid: Uuid,
+}
+
+/// Retrieves an open lobbies.
+///
+/// If `password` is `true`, the lobby is secured by a user-set password
+#[utoipa::path(
+    tag = "Lobbies",
+    context_path = "/api/v2",
+    responses(
+        (status = 200, description = "Returns all currently open lobbies", body = GetLobbyResponse),
+        (status = 400, description = "Client error", body = ApiErrorResponse),
+        (status = 500, description = "Server error", body = ApiErrorResponse),
+    ),
+    params(PathUuid),
+    security(("session_cookie" = []))
+)]
+#[get("/lobbies/{uuid}")]
+pub async fn get_lobby(
+    path: Path<PathUuid>,
+    db: Data<Database>,
+) -> ApiResult<Json<GetLobbyResponse>> {
+    let mut tx = db.start_transaction().await?;
+
+    let (
+        uuid,
+        owner_uuid,
+        owner_username,
+        owner_display_name,
+        name,
+        created_at,
+        max_player,
+        password_hash,
+        chat_room_uuid,
+    ) = query!(
+        &mut tx,
+        (
+            Lobby::F.uuid,
+            Lobby::F.owner.uuid,
+            Lobby::F.owner.username,
+            Lobby::F.owner.display_name,
+            Lobby::F.name,
+            Lobby::F.created_at,
+            Lobby::F.max_player,
+            Lobby::F.password_hash,
+            Lobby::F.chat_room.uuid,
+        )
+    )
+    .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+    .optional()
+    .await?
+    .ok_or(ApiError::InvalidUuid)?;
+
+    let current_players = query!(
+        &mut tx,
+        (
+            LobbyAccount::F.player.uuid,
+            LobbyAccount::F.player.username,
+            LobbyAccount::F.player.display_name,
+        )
+    )
+    .condition(LobbyAccount::F.lobby.equals(uuid.as_ref()))
+    .all()
+    .await?;
+
+    tx.commit().await?;
+
+    // Ok as current_player is populated before
+    #[allow(clippy::unwrap_used)]
+    Ok(Json(GetLobbyResponse {
+        uuid,
+        name,
+        owner: AccountResponse {
+            uuid: owner_uuid,
+            username: owner_username,
+            display_name: owner_display_name,
+        },
+        current_players: current_players
+            .into_iter()
+            .map(|(uuid, username, display_name)| AccountResponse {
+                uuid,
+                username,
+                display_name,
+            })
+            .collect(),
+        max_players: max_player as u8,
+        password: password_hash.is_some(),
+        created_at: DateTime::from_utc(created_at, Utc),
+        chat_room_uuid,
     }))
 }
 

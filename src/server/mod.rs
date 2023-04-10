@@ -23,11 +23,11 @@ use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
     accept_friend_request, close_lobby, create_friend_request, create_invite, create_lobby,
-    delete_friend, delete_invite, delete_me, get_all_chats, get_chat, get_friends, get_game,
-    get_invites, get_lobbies, get_me, get_open_games, health, join_lobby, kick_player_from_lobby,
-    leave_lobby, login, logout, lookup_account_by_username, lookup_account_by_uuid,
-    push_game_update, register_account, send_message, set_password, start_game, update_me, version,
-    websocket, welcome_page,
+    delete_friend, delete_invite, delete_me, get_all_chats, get_all_lobbies, get_chat, get_friends,
+    get_game, get_invites, get_lobby, get_me, get_open_games, health, join_lobby,
+    kick_player_from_lobby, leave_lobby, login, logout, lookup_account_by_username,
+    lookup_account_by_uuid, push_game_update, register_account, send_message, set_password,
+    start_game, update_me, version, websocket, welcome_page,
 };
 use crate::server::middleware::{
     handle_not_found, json_extractor_error, AuthenticationRequired, TokenRequired,
@@ -126,7 +126,8 @@ pub async fn start_server(
                     .service(accept_friend_request)
                     .service(get_friends)
                     .service(delete_friend)
-                    .service(get_lobbies)
+                    .service(get_all_lobbies)
+                    .service(get_lobby)
                     .service(create_lobby)
                     .service(join_lobby)
                     .service(leave_lobby)
