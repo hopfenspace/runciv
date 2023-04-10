@@ -35,7 +35,7 @@ impl Modify for CookieSecurity {
         handler::accept_friend_request,
         handler::get_friends,
         handler::delete_friend,
-        handler::get_lobby,
+        handler::get_all_lobbies,
         handler::create_lobby,
         handler::lookup_account_by_uuid,
         handler::lookup_account_by_username,
