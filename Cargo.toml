@@ -12,7 +12,7 @@ repository = "https://github.com/hopfenspace/runciv"
 # Web framework
 actix-web = { version = "~4" }
 # Extensions for actix-web
-actix-toolbox = { version = "~0.10", features = ["logging", "ws", "session"] }
+actix-toolbox = { version = "~0.11", features = ["logging", "ws", "session"] }
 
 # openapi swagger
 utoipa = { version = "~3", features = ["actix_extras", "repr", "chrono", "uuid", "openapi_extensions", "preserve_order"] }
