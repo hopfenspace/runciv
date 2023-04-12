@@ -521,7 +521,7 @@ pub async fn start_game(
 
     // Delete lobby
     rorm::delete!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
         .await?;
 
     tx.commit().await?;
