@@ -291,10 +291,9 @@ pub async fn push_game_update(
 
     // Update the game state identifier and last player in the database,
     // which also updates the last access time automatically
-    let updated_by = uuid.to_bytes_le();
     update!(&mut tx, Game)
         .set(Game::F.data_id, new_data_id)
-        .set(Game::F.updated_by, updated_by.as_ref())
+        .set(Game::F.updated_by, uuid.as_ref())
         .condition(Game::F.uuid.equals(game_uuid.as_ref()))
         .await?;
 
