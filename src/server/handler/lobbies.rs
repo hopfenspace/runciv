@@ -855,6 +855,15 @@ pub async fn leave_lobby(
         ))
         .await?;
 
+    rorm::delete!(&mut tx, ChatRoomMember)
+        .condition(and!(
+            ChatRoomMember::F
+                .chat_room
+                .equals(lobby.chat_room.key().as_ref()),
+            ChatRoomMember::F.member.equals(uuid.as_ref())
+        ))
+        .await?;
+
     let (uuid, username, display_name) = query!(
         &mut tx,
         (
