@@ -690,6 +690,15 @@ pub async fn join_lobby(
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
 
+    // Add player to chatroom
+    insert!(&mut tx, ChatRoomMemberInsert)
+        .single(&ChatRoomMemberInsert {
+            uuid: Uuid::new_v4(),
+            member: ForeignModelByField::Key(uuid),
+            chat_room: ForeignModelByField::Key(*lobby.chat_room.key()),
+        })
+        .await?;
+
     tx.commit().await?;
 
     let players: Vec<Uuid> = iter::once(*lobby.owner.key())
