@@ -544,7 +544,7 @@ pub async fn accept_friend_request(
 
     // Notify other party about accepted friendship
     if let Err(err) = ws_manager_chan
-        .send(WsManagerMessage::SendMessage(uuid, msg))
+        .send(WsManagerMessage::SendMessage(*f.from.key(), msg))
         .await
     {
         warn!("Could not send to ws manager chan: {err}");
