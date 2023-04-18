@@ -114,7 +114,7 @@ pub async fn create_invite(
     };
 
     if let Err(err) = ws_manager_chan
-        .send(WsManagerMessage::SendMessage(uuid, invite))
+        .send(WsManagerMessage::SendMessage(friend_account.uuid, invite))
         .await
     {
         error!("Could not send to ws manager chan: {err}");
