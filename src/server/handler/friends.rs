@@ -11,7 +11,8 @@ use uuid::Uuid;
 
 use crate::chan::{FriendshipEvent, WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
-    Account, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert, FriendWithChatInsert,
+    Account, ChatRoom, ChatRoomInsert, ChatRoomMemberInsert, Friend, FriendInsert,
+    FriendWithChatInsert,
 };
 use crate::server::handler::{
     AccountResponse, ApiError, ApiResult, OnlineAccountResponse, PathUuid,
@@ -379,8 +380,20 @@ pub async fn delete_friend(
     }
 
     rorm::delete!(&mut tx, Friend)
-        .condition(Friend::F.uuid.equals(f.uuid.as_ref()))
+        .condition(or!(
+            Friend::F.uuid.equals(f.uuid.as_ref()),
+            and!(
+                Friend::F.to.equals(f.from.key().as_ref()),
+                Friend::F.from.equals(f.to.key().as_ref())
+            )
+        ))
         .await?;
+
+    if let Some(chat_room) = f.chat_room {
+        rorm::delete!(&mut tx, ChatRoom)
+            .condition(ChatRoom::F.uuid.equals(chat_room.key().as_ref()))
+            .await?;
+    }
 
     let other_party = if *f.from.key() == uuid {
         *f.to.key()
