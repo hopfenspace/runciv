@@ -870,7 +870,8 @@ pub async fn leave_lobby(
         },
     };
 
-    let players = iter::once(uuid).chain(current_player.into_iter().map(|x| *x.player.key()));
+    let players =
+        iter::once(*lobby.owner.key()).chain(current_player.into_iter().map(|x| *x.player.key()));
 
     // Notify other players
     for player in players {
