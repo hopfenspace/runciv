@@ -312,7 +312,7 @@ pub async fn push_game_update(
         game_data_id: new_data_id as u64,
         game_data: req.game_data.clone(),
     };
-    for player in players.into_iter().filter(|x| *x == uuid) {
+    for player in players.into_iter().filter(|x| *x != uuid) {
         if let Err(err) = ws_manager_chan
             .send(WsManagerMessage::SendMessage(player, msg.clone()))
             .await
