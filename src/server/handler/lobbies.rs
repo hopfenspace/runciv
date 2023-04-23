@@ -534,7 +534,7 @@ pub async fn start_game(
         lobby_chat_uuid: *lobby.chat_room.key(),
     };
 
-    for p in player.into_iter().filter(|x| *x == uuid) {
+    for p in player.into_iter().filter(|x| *x != uuid) {
         if let Err(err) = ws_manager_chan
             .send(WsManagerMessage::SendMessage(p, msg.clone()))
             .await
