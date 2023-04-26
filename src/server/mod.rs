@@ -1,6 +1,9 @@
 //! This module holds the server definition
 
+use std::fs::{create_dir_all, set_permissions, Permissions};
 use std::net::SocketAddr;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 use actix_toolbox::tb_middleware::{
     setup_logging_mw, DBSessionStore, LoggingMiddlewareConfig, PersistentSession, SessionMiddleware,
@@ -69,6 +72,12 @@ pub async fn start_server(
     let admin_token = config.server.admin_token.clone();
     if admin_token.is_empty() {
         return Err(StartServerError::InvalidSecretKey);
+    }
+
+    let game_data = Path::new(&config.server.game_data_path);
+    if !game_data.exists() {
+        create_dir_all(game_data)?;
+        set_permissions(game_data, Permissions::from_mode(0o700))?;
     }
 
     let runtime_settings = RuntimeSettings {
