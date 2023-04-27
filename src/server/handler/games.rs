@@ -303,7 +303,9 @@ pub async fn push_game_update(
     let old_filename = format!("game_{game_uuid}_{old}.txt", old = game.data_id);
     let old_path = StdPath::new(&settings.game_data_path).join(&old_filename);
     if let Err(e) = remove_file(&old_path).await {
-        warn!("Outdated data in '{old_filename}' could not be removed and may leak: {e}");
+        if new_data_id != 1 {
+            warn!("Outdated data in '{old_filename}' could not be removed and may leak: {e}");
+        }
     }
 
     // Notify all remaining players about the new game data
