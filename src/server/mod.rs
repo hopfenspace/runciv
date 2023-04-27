@@ -86,8 +86,12 @@ pub async fn start_server(
 
     HttpServer::new(move || {
         App::new()
-            .app_data(PayloadConfig::default())
-            .app_data(JsonConfig::default().error_handler(json_extractor_error))
+            .app_data(PayloadConfig::default().limit(1_000_000))
+            .app_data(
+                JsonConfig::default()
+                    .limit(1_000_000)
+                    .error_handler(json_extractor_error),
+            )
             .app_data(Data::new(runtime_settings.clone()))
             .app_data(Data::new(db.clone()))
             .app_data(Data::new(ws_manager_chan.clone()))
