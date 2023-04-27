@@ -8,7 +8,7 @@ use actix_web::web::{Data, Payload};
 use actix_web::{get, HttpRequest, HttpResponse};
 use bytes::Bytes;
 use bytestring::ByteString;
-use log::{debug, error};
+use log::{debug, error, warn};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -61,11 +61,19 @@ pub async fn websocket(
     // Heartbeat task
     let hb_tx = tx.clone();
     let hb_time = last_hb.clone();
+    let hb_ws_manager = ws_manager_chan.clone();
+    let hb_uuid = uuid.clone();
     tokio::spawn(async move {
         loop {
             if Instant::now().duration_since(*hb_time.lock().await) > CLIENT_TIMEOUT
                 && hb_tx.close().await.is_ok()
             {
+                if let Err(err) = hb_ws_manager
+                    .send(WsManagerMessage::WebsocketClosed(hb_uuid))
+                    .await
+                {
+                    warn!("Could not send to ws_manager_chan: {err}");
+                }
                 debug!("Closed websocket due to missing heartbeat responses");
             }
 
@@ -75,6 +83,8 @@ pub async fn websocket(
     });
 
     let rx_tx = tx.clone();
+    let rx_ws_manager = ws_manager_chan.clone();
+    let rx_uuid = uuid.clone();
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
             match res {
@@ -83,6 +93,15 @@ pub async fn websocket(
                     Message::Pong(_) => {
                         let mut r = last_hb.lock().await;
                         *r = Instant::now();
+                    }
+                    Message::Close(_) => {
+                        debug!("Client closed websocket");
+                        if let Err(err) = rx_ws_manager
+                            .send(WsManagerMessage::WebsocketClosed(rx_uuid))
+                            .await
+                        {
+                            warn!("Could not send to ws_manager_chan: {err}");
+                        }
                     }
                     _ => {
                         invalid_msg!(rx_tx);

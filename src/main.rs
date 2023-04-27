@@ -69,7 +69,7 @@ async fn main() -> Result<(), String> {
             let db = get_db(&conf).await?;
             info!("Connected to database");
 
-            let ws_manager_chan = start_ws_manager().await?;
+            let ws_manager_chan = start_ws_manager(db.clone()).await?;
 
             if let Err(err) = start_server(&conf, db, ws_manager_chan).await {
                 error!("Error while starting server: {err}");

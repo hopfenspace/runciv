@@ -2,13 +2,15 @@ use std::collections::HashMap;
 
 use actix_toolbox::ws;
 use actix_toolbox::ws::Message;
-use log::error;
+use log::{error, info, warn};
+use rorm::{delete, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use uuid::Uuid;
 
+use crate::models::{ChatRoom, Lobby, LobbyAccount};
 use crate::server::handler::{AccountResponse, ChatMessage};
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
@@ -177,6 +179,8 @@ pub type WsManagerChan = Sender<WsManagerMessage>;
 
 /// Messages to control the websocket manager
 pub enum WsManagerMessage {
+    /// The websocket was closed by the client (timeout, or closed event)
+    WebsocketClosed(Uuid),
     /// Close the socket from the server side
     CloseSocket(Uuid),
     /// Client with given uuid initialized a websocket
@@ -203,14 +207,96 @@ pub enum WsManagerMessage {
 /// Start the websocket manager
 ///
 /// It will return a channel to this manager
-pub async fn start_ws_manager() -> Result<WsManagerChan, String> {
+pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
     let mut lookup: HashMap<Uuid, Vec<Sender<WsMessage>>> = HashMap::new();
 
     let (tx, mut rx) = mpsc::channel(16);
 
+    let rx_tx = tx.clone();
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             match msg {
+                WsManagerMessage::WebsocketClosed(uuid) => {
+                    lookup.remove(&uuid);
+
+                    // Start cleanup task
+                    let db = db.clone();
+                    let cleanup_tx = rx_tx.clone();
+                    tokio::spawn(async move {
+                        let mut tx = match db.start_transaction().await {
+                            Ok(tx) => tx,
+                            Err(err) => {
+                                error!("Database error: {err}");
+                                return;
+                            }
+                        };
+
+                        // Check if the account was a lobby owner
+                        match query!(&mut tx, Lobby)
+                            .condition(LobbyAccount::F.lobby.owner.equals(uuid.as_ref()))
+                            .optional()
+                            .await
+                        {
+                            Ok(lobby) => {
+                                if let Some(mut lobby) = lobby {
+                                    info!(
+                                        "Closing lobby {} due to missing ws connection of owner {uuid}",
+                                        lobby.uuid
+                                    );
+
+                                    if let Err(err) =
+                                        Lobby::F.current_player.populate(&mut tx, &mut lobby).await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    if let Err(err) = delete!(&mut tx, ChatRoom)
+                                        .condition(
+                                            ChatRoom::F.uuid.equals(lobby.chat_room.key().as_ref()),
+                                        )
+                                        .await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    if let Err(err) = delete!(&mut tx, Lobby)
+                                        .condition(Lobby::F.uuid.equals(lobby.uuid.as_ref()))
+                                        .await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    // Queried beforehand
+                                    #[allow(clippy::unwrap_used)]
+                                    for player in lobby.current_player.cached.unwrap() {
+                                        if let Err(err) = cleanup_tx
+                                            .send(WsManagerMessage::SendMessage(
+                                                *player.player.key(),
+                                                WsMessage::LobbyClosed {
+                                                    lobby_uuid: lobby.uuid,
+                                                },
+                                            ))
+                                            .await
+                                        {
+                                            warn!("Could not send to ws manager chan: {err}");
+                                        }
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                error!("Database error: {err}");
+                                return;
+                            }
+                        }
+
+                        if let Err(err) = tx.commit().await {
+                            error!("Database error: {err}");
+                        }
+                    });
+                }
                 WsManagerMessage::CloseSocket(uuid) => {
                     // Trigger close for all websockets associated with uuid
                     if let Some(sockets) = lookup.get(&uuid) {
