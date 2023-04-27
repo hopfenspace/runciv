@@ -1,16 +1,17 @@
 use std::collections::HashMap;
+use std::iter;
 
 use actix_toolbox::ws;
 use actix_toolbox::ws::Message;
 use log::{error, info, warn};
-use rorm::{delete, query, Database, Model};
+use rorm::{and, delete, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use uuid::Uuid;
 
-use crate::models::{ChatRoom, Lobby};
+use crate::models::{Account, ChatRoom, ChatRoomMember, Lobby, LobbyAccount};
 use crate::server::handler::{AccountResponse, ChatMessage};
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
@@ -231,6 +232,19 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                             }
                         };
 
+                        let (username, display_name) =
+                            match query!(&mut tx, (Account::F.username, Account::F.display_name))
+                                .condition(Account::F.uuid.equals(uuid.as_ref()))
+                                .one()
+                                .await
+                            {
+                                Ok(x) => x,
+                                Err(err) => {
+                                    error!("Database error: {err}");
+                                    return;
+                                }
+                            };
+
                         // Check if the account was a lobby owner
                         match query!(&mut tx, Lobby)
                             .condition(Lobby::F.owner.equals(uuid.as_ref()))
@@ -277,6 +291,94 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                                                 *player.player.key(),
                                                 WsMessage::LobbyClosed {
                                                     lobby_uuid: lobby.uuid,
+                                                },
+                                            ))
+                                            .await
+                                        {
+                                            warn!("Could not send to ws manager chan: {err}");
+                                        }
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                error!("Database error: {err}");
+                                return;
+                            }
+                        }
+
+                        match query!(&mut tx, LobbyAccount)
+                            .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
+                            .all()
+                            .await
+                        {
+                            Ok(lobby_accounts) => {
+                                for lobby_account in lobby_accounts {
+                                    let mut lobby = match query!(&mut tx, Lobby)
+                                        .condition(
+                                            Lobby::F.uuid.equals(lobby_account.uuid.as_ref()),
+                                        )
+                                        .one()
+                                        .await
+                                    {
+                                        Ok(v) => v,
+                                        Err(err) => {
+                                            error!("Database error: {err}");
+                                            return;
+                                        }
+                                    };
+
+                                    if let Err(err) =
+                                        Lobby::F.current_player.populate(&mut tx, &mut lobby).await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    if let Err(err) = delete!(&mut tx, ChatRoomMember)
+                                        .condition(and!(
+                                            ChatRoomMember::F.member.equals(uuid.as_ref()),
+                                            ChatRoomMember::F
+                                                .chat_room
+                                                .equals(lobby.chat_room.key().as_ref())
+                                        ))
+                                        .await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    if let Err(err) = delete!(&mut tx, LobbyAccount)
+                                        .condition(and!(
+                                            LobbyAccount::F.player.equals(uuid.as_ref()),
+                                            LobbyAccount::F.lobby.equals(lobby.uuid.as_ref())
+                                        ))
+                                        .await
+                                    {
+                                        error!("Database error: {err}");
+                                        return;
+                                    }
+
+                                    // Queried beforehand
+                                    #[allow(clippy::unwrap_used)]
+                                    for player in iter::once(*lobby.owner.key()).chain(
+                                        lobby
+                                            .current_player
+                                            .cached
+                                            .unwrap()
+                                            .into_iter()
+                                            .filter(|x| *x.player.key() == uuid)
+                                            .map(|x| *x.player.key()),
+                                    ) {
+                                        if let Err(err) = cleanup_tx
+                                            .send(WsManagerMessage::SendMessage(
+                                                player,
+                                                WsMessage::LobbyLeave {
+                                                    lobby_uuid: lobby.uuid,
+                                                    player: AccountResponse {
+                                                        uuid,
+                                                        username: username.clone(),
+                                                        display_name: display_name.clone(),
+                                                    },
                                                 },
                                             ))
                                             .await
