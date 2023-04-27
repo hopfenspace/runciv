@@ -275,6 +275,7 @@ pub struct CreateLobbyResponse {
 /// If you are already in another lobby, an error is returned.
 /// `max_players` must be between 2 and 34 (inclusive).
 /// If `password` is an empty string, an error is returned.
+/// If you are not connected via websocket, an error is returned.
 ///
 /// You are placed in the lobby and in the corresponding chatroom
 #[utoipa::path(
@@ -293,6 +294,7 @@ pub async fn create_lobby(
     req: Json<CreateLobbyRequest>,
     db: Data<Database>,
     session: Session,
+    ws_manager_chan: Data<WsManagerChan>,
 ) -> ApiResult<Json<CreateLobbyResponse>> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
@@ -301,6 +303,28 @@ pub async fn create_lobby(
     // Check if the request is valid
     if req.max_players < 2 || req.max_players > 34 {
         return Err(ApiError::InvalidMaxPlayersCount);
+    }
+
+    // Check if the websocket of the executing user is connected
+    let (sender, receiver) = oneshot::channel();
+    if let Err(err) = ws_manager_chan
+        .send(WsManagerMessage::RetrieveOnlineState(uuid, sender))
+        .await
+    {
+        warn!("Could not send to ws manager chan: {err}");
+        return Err(ApiError::InternalServerError);
+    }
+
+    match receiver.await {
+        Ok(online) => {
+            if !online {
+                return Err(ApiError::WsNotConnected);
+            }
+        }
+        Err(err) => {
+            warn!("Error receiving online state: {err}");
+            return Err(ApiError::InternalServerError);
+        }
     }
 
     // Check if the executing account is already in a lobby
