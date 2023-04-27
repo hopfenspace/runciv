@@ -366,7 +366,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                                             .cached
                                             .unwrap()
                                             .into_iter()
-                                            .filter(|x| *x.player.key() == uuid)
+                                            .filter(|x| *x.player.key() != uuid)
                                             .map(|x| *x.player.key()),
                                     ) {
                                         if let Err(err) = cleanup_tx
