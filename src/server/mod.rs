@@ -66,9 +66,6 @@ pub async fn start_server(
             .as_slice(),
     )?;
 
-    let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
-    info!("Starting to listen on {}", s_addr);
-
     let admin_token = config.server.admin_token.clone();
     if admin_token.is_empty() {
         return Err(StartServerError::InvalidSecretKey);
@@ -76,6 +73,10 @@ pub async fn start_server(
 
     let game_data = Path::new(&config.server.game_data_path);
     if !game_data.exists() {
+        info!(
+            "Creating game directory at: {}",
+            config.server.game_data_path
+        );
         create_dir_all(game_data)?;
         set_permissions(game_data, Permissions::from_mode(0o700))?;
     }
@@ -83,6 +84,9 @@ pub async fn start_server(
     let runtime_settings = RuntimeSettings {
         game_data_path: config.server.game_data_path.clone(),
     };
+
+    let s_addr = SocketAddr::new(config.server.listen_address, config.server.listen_port);
+    info!("Starting to listen on {}", s_addr);
 
     HttpServer::new(move || {
         App::new()
