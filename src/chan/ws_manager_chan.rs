@@ -233,7 +233,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
 
                         // Check if the account was a lobby owner
                         match query!(&mut tx, Lobby)
-                            .condition(LobbyAccount::F.lobby.owner.equals(uuid.as_ref()))
+                            .condition(Lobby::F.owner.equals(uuid.as_ref()))
                             .optional()
                             .await
                         {
