@@ -62,7 +62,7 @@ pub async fn websocket(
     let hb_tx = tx.clone();
     let hb_time = last_hb.clone();
     let hb_ws_manager = ws_manager_chan.clone();
-    let hb_uuid = uuid.clone();
+    let hb_uuid = uuid;
     tokio::spawn(async move {
         loop {
             if Instant::now().duration_since(*hb_time.lock().await) > CLIENT_TIMEOUT
@@ -84,7 +84,7 @@ pub async fn websocket(
 
     let rx_tx = tx.clone();
     let rx_ws_manager = ws_manager_chan.clone();
-    let rx_uuid = uuid.clone();
+    let rx_uuid = uuid;
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
             match res {
