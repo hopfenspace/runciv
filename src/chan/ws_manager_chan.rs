@@ -10,7 +10,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use uuid::Uuid;
 
-use crate::models::{ChatRoom, Lobby, LobbyAccount};
+use crate::models::{ChatRoom, Lobby};
 use crate::server::handler::{AccountResponse, ChatMessage};
 
 pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
