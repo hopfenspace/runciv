@@ -14,7 +14,12 @@ use uuid::Uuid;
 use crate::models::{Account, ChatRoom, ChatRoomMember, Lobby, LobbyAccount};
 use crate::server::handler::{AccountResponse, ChatMessage};
 
-pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
+pub(crate) async fn start_ws_sender(
+    tx: ws::Sender,
+    mut rx: mpsc::Receiver<WsMessage>,
+    ws_manager_chan: WsManagerChan,
+    uuid: Uuid,
+) {
     while let Some(msg) = rx.recv().await {
         match msg {
             WsMessage::ServerQuitSocket => {
@@ -36,6 +41,12 @@ pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMes
                     error!("Error sending to client: {err}, closing socket");
                     if let Err(err) = tx.close().await {
                         error!("Error closing socket: {err}");
+                    }
+                    if let Err(err) = ws_manager_chan
+                        .send(WsManagerMessage::WebsocketClosed(uuid))
+                        .await
+                    {
+                        warn!("Could not send to ws manager chan: {err}");
                     }
                 }
             }
@@ -415,7 +426,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                 }
                 WsManagerMessage::OpenedSocket(uuid, ws_tx) => {
                     let (tx, rx) = mpsc::channel(16);
-                    task::spawn(start_ws_sender(ws_tx, rx));
+                    task::spawn(start_ws_sender(ws_tx, rx, rx_tx.clone(), uuid));
 
                     // Add new client connection to state
                     if let Some(sockets) = lookup.get_mut(&uuid) {
