@@ -327,7 +327,9 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                                 for lobby_account in lobby_accounts {
                                     let mut lobby = match query!(&mut tx, Lobby)
                                         .condition(
-                                            Lobby::F.uuid.equals(lobby_account.uuid.as_ref()),
+                                            Lobby::F
+                                                .uuid
+                                                .equals(lobby_account.lobby.key().as_ref()),
                                         )
                                         .one()
                                         .await
