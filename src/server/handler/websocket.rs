@@ -75,7 +75,7 @@ pub async fn websocket(
 
             if let Err(err) = hb_tx.send(Message::Ping(Bytes::from(""))).await {
                 if let MailboxError::Closed = err {
-                    debug!("Could not send pong to ws: ws closed");
+                    debug!("Could not send ping to ws: ws closed");
                     if let Err(err) = hb_ws_manager
                         .send(WsManagerMessage::WebsocketClosed(hb_uuid))
                         .await
