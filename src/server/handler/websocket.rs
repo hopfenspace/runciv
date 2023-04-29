@@ -68,12 +68,6 @@ pub async fn websocket(
             if Instant::now().duration_since(*hb_time.lock().await) > CLIENT_TIMEOUT
                 && hb_tx.close().await.is_ok()
             {
-                if let Err(err) = hb_ws_manager
-                    .send(WsManagerMessage::WebsocketClosed(hb_uuid))
-                    .await
-                {
-                    warn!("Could not send to ws_manager_chan: {err}");
-                }
                 debug!("Closed websocket due to missing heartbeat responses");
             }
 
@@ -105,13 +99,7 @@ pub async fn websocket(
                     Message::Ping(req) => {
                         if let Err(err) = rx_tx.send(Message::Ping(req)).await {
                             if let MailboxError::Closed = err {
-                                debug!("Websocket closed");
-                                if let Err(err) = rx_ws_manager
-                                    .send(WsManagerMessage::WebsocketClosed(rx_uuid))
-                                    .await
-                                {
-                                    warn!("Could not send to ws_manager_chan: {err}");
-                                }
+                                debug!("Could not ping send to ws: websocket closed");
                                 break;
                             }
                             debug!("Sending to ran into tx timeout");
@@ -120,6 +108,10 @@ pub async fn websocket(
                     Message::Pong(_) => {
                         let mut r = last_hb.lock().await;
                         *r = Instant::now();
+                    }
+                    Message::Close(_) => {
+                        debug!("Client closed websocket");
+                        break;
                     }
                     _ => {
                         invalid_msg!(rx_tx);
