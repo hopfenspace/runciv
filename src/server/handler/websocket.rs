@@ -14,8 +14,8 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
+use crate::invalid_msg;
 use crate::server::handler::ApiError;
-use crate::{invalid_msg, send_to_ws};
 
 struct CommonMessages {
     invalid_message: ByteString,
@@ -78,7 +78,20 @@ pub async fn websocket(
             }
 
             tokio::time::sleep(Duration::from_secs(10)).await;
-            send_to_ws!(hb_tx, Message::Ping(Bytes::from("")));
+
+            if let Err(err) = hb_tx.send(Message::Ping(Bytes::from(""))).await {
+                if let MailboxError::Closed = err {
+                    debug!("Websocket closed");
+                    if let Err(err) = hb_ws_manager
+                        .send(WsManagerMessage::WebsocketClosed(hb_uuid))
+                        .await
+                    {
+                        warn!("Could not send to ws_manager_chan: {err}");
+                    }
+                    break;
+                }
+                debug!("Sending to ran into tx timeout");
+            };
         }
     });
 
@@ -89,19 +102,24 @@ pub async fn websocket(
         while let Some(res) = rx.recv().await {
             match res {
                 Ok(msg) => match msg {
-                    Message::Ping(req) => send_to_ws!(rx_tx, Message::Pong(req)),
+                    Message::Ping(req) => {
+                        if let Err(err) = rx_tx.send(Message::Ping(req)).await {
+                            if let MailboxError::Closed = err {
+                                debug!("Websocket closed");
+                                if let Err(err) = rx_ws_manager
+                                    .send(WsManagerMessage::WebsocketClosed(rx_uuid))
+                                    .await
+                                {
+                                    warn!("Could not send to ws_manager_chan: {err}");
+                                }
+                                break;
+                            }
+                            debug!("Sending to ran into tx timeout");
+                        }
+                    }
                     Message::Pong(_) => {
                         let mut r = last_hb.lock().await;
                         *r = Instant::now();
-                    }
-                    Message::Close(_) => {
-                        debug!("Client closed websocket");
-                        if let Err(err) = rx_ws_manager
-                            .send(WsManagerMessage::WebsocketClosed(rx_uuid))
-                            .await
-                        {
-                            warn!("Could not send to ws_manager_chan: {err}");
-                        }
                     }
                     _ => {
                         invalid_msg!(rx_tx);
@@ -112,6 +130,14 @@ pub async fn websocket(
                     debug!("Protocol error: {err}");
                 }
             }
+        }
+
+        debug!("Websocket closed");
+        if let Err(err) = rx_ws_manager
+            .send(WsManagerMessage::WebsocketClosed(rx_uuid))
+            .await
+        {
+            warn!("Could not send to ws_manager_chan: {err}");
         }
     });
 
@@ -140,23 +166,6 @@ macro_rules! invalid_msg {
             .send(Message::Text(COMMON.invalid_message.clone()))
             .await
         {
-            if let MailboxError::Closed = err {
-                debug!("Websocket closed");
-                break;
-            }
-            debug!("Sending to ran into tx timeout");
-        }
-    };
-}
-
-/// Use this macro to send arbitrary messages to the websocket
-///
-/// First argument is the websocket
-/// Second argument the Message to send.
-#[macro_export]
-macro_rules! send_to_ws {
-    ($tx:expr, $msg:expr) => {
-        if let Err(err) = $tx.send($msg).await {
             if let MailboxError::Closed = err {
                 debug!("Websocket closed");
                 break;
