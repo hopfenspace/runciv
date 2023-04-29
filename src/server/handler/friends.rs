@@ -272,6 +272,11 @@ pub async fn create_friend_request(
 
     let mut tx = db.start_transaction().await?;
 
+    // Check if target is self
+    if uuid == req.uuid {
+        return Err(ApiError::InvalidUuid)?;
+    }
+
     // Check if target exists
     let target = query!(&mut tx, Account)
         .condition(Account::F.uuid.equals(req.uuid.as_bytes().as_slice()))
