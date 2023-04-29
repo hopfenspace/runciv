@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::iter;
 
 use actix_toolbox::ws;
-use actix_toolbox::ws::Message;
-use log::{error, info, warn};
+use actix_toolbox::ws::{MailboxError, Message};
+use log::{debug, error, info, warn};
 use rorm::{and, delete, query, Database, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
@@ -14,17 +14,16 @@ use uuid::Uuid;
 use crate::models::{Account, ChatRoom, ChatRoomMember, Lobby, LobbyAccount};
 use crate::server::handler::{AccountResponse, ChatMessage};
 
-pub(crate) async fn start_ws_sender(
-    tx: ws::Sender,
-    mut rx: mpsc::Receiver<WsMessage>,
-    ws_manager_chan: WsManagerChan,
-    uuid: Uuid,
-) {
+pub(crate) async fn start_ws_sender(tx: ws::Sender, mut rx: mpsc::Receiver<WsMessage>) {
     while let Some(msg) = rx.recv().await {
         match msg {
             WsMessage::ServerQuitSocket => {
                 if let Err(err) = tx.close().await {
-                    error!("Error while closing ws sender: {err}");
+                    if let MailboxError::Closed = err {
+                        debug!("Could not closed websocket as it was already closed")
+                    } else {
+                        error!("Error while closing ws sender: {err}");
+                    }
                 }
                 break;
             }
@@ -38,15 +37,17 @@ pub(crate) async fn start_ws_sender(
                 };
 
                 if let Err(err) = tx.send(Message::Text(txt.into())).await {
-                    error!("Error sending to client: {err}, closing socket");
-                    if let Err(err) = tx.close().await {
-                        error!("Error closing socket: {err}");
-                    }
-                    if let Err(err) = ws_manager_chan
-                        .send(WsManagerMessage::WebsocketClosed(uuid))
-                        .await
-                    {
-                        warn!("Could not send to ws manager chan: {err}");
+                    if let MailboxError::Closed = err {
+                        debug!("Could not send message to websocket as it was already closed")
+                    } else {
+                        error!("Error sending to client: {err}, closing socket");
+                        if let Err(err) = tx.close().await {
+                            if let MailboxError::Closed = err {
+                                debug!("Could not closed websocket as it was already closed")
+                            } else {
+                                error!("Error while closing ws sender: {err}");
+                            }
+                        }
                     }
                 }
             }
@@ -426,7 +427,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                 }
                 WsManagerMessage::OpenedSocket(uuid, ws_tx) => {
                     let (tx, rx) = mpsc::channel(16);
-                    task::spawn(start_ws_sender(ws_tx, rx, rx_tx.clone(), uuid));
+                    task::spawn(start_ws_sender(ws_tx, rx));
 
                     // Add new client connection to state
                     if let Some(sockets) = lookup.get_mut(&uuid) {
