@@ -97,7 +97,7 @@ pub async fn websocket(
             match res {
                 Ok(msg) => match msg {
                     Message::Ping(req) => {
-                        if let Err(err) = rx_tx.send(Message::Ping(req)).await {
+                        if let Err(err) = rx_tx.send(Message::Pong(req)).await {
                             if let MailboxError::Closed = err {
                                 debug!("Could not pong send to ws: websocket closed");
                                 break;
