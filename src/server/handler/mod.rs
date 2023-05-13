@@ -77,6 +77,7 @@ pub(crate) enum ApiStatusCode {
     WsNotConnected = 1021,
     LobbyFull = 1022,
     InvalidPlayerUuid = 1023,
+    AlreadyInThisLobby = 1024,
 
     InternalServerError = 2000,
     DatabaseError = 2001,
@@ -157,6 +158,8 @@ pub enum ApiError {
     LobbyFull,
     /// The provided player uuid was not valid
     InvalidPlayerUuid,
+    /// The target is already in this lobby
+    AlreadyInThisLobby,
 
     /// Unknown error occurred
     InternalServerError,
@@ -212,6 +215,7 @@ impl Display for ApiError {
             ),
             ApiError::LobbyFull => write!(f, "The lobby is full"),
             ApiError::InvalidPlayerUuid => write!(f, "Invalid player uuid was specified"),
+            ApiError::AlreadyInThisLobby => write!(f, "The target player is already in this lobby"),
         }
     }
 }
@@ -411,6 +415,10 @@ impl actix_web::ResponseError for ApiError {
             )),
             ApiError::InvalidPlayerUuid => HttpResponse::BadRequest().json(ApiErrorResponse::new(
                 ApiStatusCode::InvalidPlayerUuid,
+                self.to_string(),
+            )),
+            ApiError::AlreadyInThisLobby => HttpResponse::BadRequest().json(ApiErrorResponse::new(
+                ApiStatusCode::AlreadyInThisLobby,
                 self.to_string(),
             )),
         }

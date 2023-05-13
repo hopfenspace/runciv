@@ -25,10 +25,10 @@ use crate::chan::WsManagerChan;
 use crate::config::Config;
 use crate::server::error::StartServerError;
 use crate::server::handler::{
-    accept_friend_request, close_lobby, create_friend_request, create_invite, create_lobby,
-    delete_friend, delete_invite, delete_me, get_all_chats, get_all_lobbies, get_chat, get_friends,
-    get_game, get_invites, get_lobby, get_me, get_open_games, health, join_lobby,
-    kick_player_from_lobby, leave_lobby, login, logout, lookup_account_by_username,
+    accept_friend_request, accept_invite, close_lobby, create_friend_request, create_invite,
+    create_lobby, delete_friend, delete_invite, delete_me, get_all_chats, get_all_lobbies,
+    get_chat, get_friends, get_game, get_invites, get_lobby, get_me, get_open_games, health,
+    join_lobby, kick_player_from_lobby, leave_lobby, login, logout, lookup_account_by_username,
     lookup_account_by_uuid, push_game_update, register_account, send_message, set_password,
     start_game, update_me, version, websocket, welcome_page,
 };
@@ -159,7 +159,8 @@ pub async fn start_server(
                     .service(get_game)
                     .service(get_open_games)
                     .service(push_game_update)
-                    .service(start_game),
+                    .service(start_game)
+                    .service(accept_invite),
             )
     })
     .bind(s_addr)?
