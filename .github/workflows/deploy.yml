@@ -1,0 +1,24 @@
+---
+name: Deployment of runciv
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: deploy to server
+        run: |
+          ssh root@91.107.223.97 "cd /root/runciv && git pull && cargo build -r && install -o root /root/runciv/target/release/runciv /usr/local/bin/runciv && /usr/local/bin/runciv migrate /root/runciv/migrations/ && systemctl restart runciv.service"
