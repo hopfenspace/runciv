@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{
     Account, ChatRoomInsert, ChatRoomMember, ChatRoomMemberInsert, ChatRoomMessage,
-    GameAccountInsert, GameInsert, Lobby, LobbyAccount, LobbyAccountInsert, LobbyInsert,
+    GameAccountInsert, GameInsert, Invite, Lobby, LobbyAccount, LobbyAccountInsert, LobbyInsert,
 };
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 
@@ -888,6 +888,11 @@ pub async fn leave_lobby(
         ))
         .await?;
 
+    // Delete all invites of this player
+    rorm::delete!(&mut tx, Invite)
+        .condition(Invite::F.from.equals(uuid.as_ref()))
+        .await?;
+
     let (uuid, username, display_name) = query!(
         &mut tx,
         (
@@ -1006,6 +1011,11 @@ pub async fn kick_player_from_lobby(
                 .equals(lobby.chat_room.key().as_ref()),
             ChatRoomMember::F.member.equals(path.player_uuid.as_ref()),
         ))
+        .await?;
+
+    // Delete all invites of this player
+    rorm::delete!(&mut tx, Invite)
+        .condition(Invite::F.from.equals(path.player_uuid.as_ref()))
         .await?;
 
     let (uuid, username, display_name) = query!(
