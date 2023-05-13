@@ -63,3 +63,9 @@ once_cell = { version = "~1" }
 
 [features]
 rorm-main = []
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
