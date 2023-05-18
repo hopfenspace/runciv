@@ -3,9 +3,27 @@ on:
   push:
     paths-ignore:
       - "*.md"
-    pull_request:
+  pull_request:
 
 jobs:
+  build_ts:
+    name: Build typescript
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Build
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
   build_rs:
     name: Build & Tests on linux
     runs-on: ubuntu-latest
