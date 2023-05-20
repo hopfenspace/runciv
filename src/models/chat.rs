@@ -16,12 +16,16 @@ pub struct ChatRoom {
 
     /// A backref to the members of a specific chatroom
     pub messages: BackRef<field!(ChatRoomMessage::F.chat_room)>,
+
+    /// The uuid of the most recent message
+    pub last_message_uuid: Option<Uuid>,
 }
 
 #[derive(Patch)]
 #[rorm(model = "ChatRoom")]
 pub(crate) struct ChatRoomInsert {
     pub(crate) uuid: Uuid,
+    pub(crate) last_message_uuid: Option<Uuid>,
 }
 
 /// The member <-> chatroom relation

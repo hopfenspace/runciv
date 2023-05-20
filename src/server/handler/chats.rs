@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::warn;
 use rorm::fields::ForeignModelByField;
-use rorm::{and, insert, query, Database, Model};
+use rorm::{and, insert, query, update, Database, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -61,9 +61,16 @@ pub struct ChatMember {
 ///
 /// `messages` should be sorted by the datetime of `message.created_at`.
 #[derive(Serialize, ToSchema)]
-pub struct GetChatResponse {
+pub struct ChatFull {
     members: Vec<ChatMember>,
     messages: Vec<ChatMessage>,
+}
+
+/// The small representation of a chatroom
+#[derive(Serialize, ToSchema)]
+pub struct ChatSmall {
+    pub(crate) uuid: Uuid,
+    pub(crate) last_message_uuid: Option<Uuid>,
 }
 
 /// Retrieve the messages of a chatroom
@@ -78,7 +85,7 @@ pub struct GetChatResponse {
     tag = "Chats",
     context_path = "/api/v2",
     responses(
-        (status = 200, description = "Returns the messages of the chat room", body = GetChatResponse),
+        (status = 200, description = "Returns the messages of the chat room", body = ChatFull),
         (status = 400, description = "Client error", body = ApiErrorResponse),
         (status = 500, description = "Server error", body = ApiErrorResponse),
     ),
@@ -90,7 +97,7 @@ pub async fn get_chat(
     path: Path<PathUuid>,
     db: Data<Database>,
     session: Session,
-) -> ApiResult<Json<GetChatResponse>> {
+) -> ApiResult<Json<ChatFull>> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let mut tx = db.start_transaction().await?;
@@ -145,7 +152,7 @@ pub async fn get_chat(
 
     tx.commit().await?;
 
-    Ok(Json(GetChatResponse {
+    Ok(Json(ChatFull {
         messages: messages
             .into_iter()
             .map(
@@ -183,9 +190,9 @@ pub async fn get_chat(
 /// All chat rooms your user has access to
 #[derive(Serialize, ToSchema)]
 pub struct GetAllChatsResponse {
-    friend_chat_rooms: Vec<Uuid>,
-    lobby_chat_rooms: Vec<Uuid>,
-    game_chat_rooms: Vec<Uuid>,
+    friend_chat_rooms: Vec<ChatSmall>,
+    lobby_chat_rooms: Vec<ChatSmall>,
+    game_chat_rooms: Vec<ChatSmall>,
 }
 
 /// Retrieve all chats the executing user has access to.
@@ -210,30 +217,66 @@ pub async fn get_all_chats(
 
     let mut tx = db.start_transaction().await?;
 
-    let friend_chat_room_uuids = query!(&mut tx, (Friend::F.chat_room.uuid,))
-        .condition(and!(
-            Friend::F.is_request.equals(false),
-            Friend::F.from.uuid.equals(uuid.as_ref())
-        ))
-        .all()
-        .await?;
+    let friend_chat_room_uuids = query!(
+        &mut tx,
+        (
+            Friend::F.chat_room.uuid,
+            Friend::F.chat_room.last_message_uuid
+        )
+    )
+    .condition(and!(
+        Friend::F.is_request.equals(false),
+        Friend::F.from.uuid.equals(uuid.as_ref())
+    ))
+    .all()
+    .await?;
 
-    let lobby_chat_room_uuids = query!(&mut tx, (LobbyAccount::F.lobby.chat_room.uuid))
-        .condition(LobbyAccount::F.player.uuid.equals(uuid.as_ref()))
-        .all()
-        .await?;
+    let lobby_chat_room_uuids = query!(
+        &mut tx,
+        (
+            LobbyAccount::F.lobby.chat_room.uuid,
+            LobbyAccount::F.lobby.chat_room.last_message_uuid
+        )
+    )
+    .condition(LobbyAccount::F.player.uuid.equals(uuid.as_ref()))
+    .all()
+    .await?;
 
-    let game_chat_room_uuids = query!(&mut tx, (GameAccount::F.game.chat_room.uuid,))
-        .condition(GameAccount::F.uuid.equals(uuid.as_ref()))
-        .all()
-        .await?;
+    let game_chat_room_uuids = query!(
+        &mut tx,
+        (
+            GameAccount::F.game.chat_room.uuid,
+            GameAccount::F.game.chat_room.last_message_uuid
+        )
+    )
+    .condition(GameAccount::F.uuid.equals(uuid.as_ref()))
+    .all()
+    .await?;
 
     tx.commit().await?;
 
     Ok(Json(GetAllChatsResponse {
-        lobby_chat_rooms: lobby_chat_room_uuids.into_iter().map(|x| x.0).collect(),
-        friend_chat_rooms: friend_chat_room_uuids.into_iter().map(|x| x.0).collect(),
-        game_chat_rooms: game_chat_room_uuids.into_iter().map(|x| x.0).collect(),
+        lobby_chat_rooms: lobby_chat_room_uuids
+            .into_iter()
+            .map(|(uuid, last_message_uuid)| ChatSmall {
+                uuid,
+                last_message_uuid,
+            })
+            .collect(),
+        friend_chat_rooms: friend_chat_room_uuids
+            .into_iter()
+            .map(|(uuid, last_message_uuid)| ChatSmall {
+                uuid,
+                last_message_uuid,
+            })
+            .collect(),
+        game_chat_rooms: game_chat_room_uuids
+            .into_iter()
+            .map(|(uuid, last_message_uuid)| ChatSmall {
+                uuid,
+                last_message_uuid,
+            })
+            .collect(),
     }))
 }
 
@@ -301,6 +344,15 @@ pub async fn send_message(
             message: req.message.clone(),
             chat_room: ForeignModelByField::Key(path.uuid),
         })
+        .await?;
+
+    update!(&mut tx, ChatRoom)
+        .condition(ChatRoom::F.uuid.equals(path.uuid.as_ref()))
+        .set(
+            ChatRoom::F.last_message_uuid,
+            Some(chat_room_message.uuid.as_ref()),
+        )
+        .exec()
         .await?;
 
     let chat_room_members = query!(&mut tx, (ChatRoomMember::F.member.uuid,))

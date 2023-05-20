@@ -368,6 +368,7 @@ pub async fn create_lobby(
         .return_primary_key()
         .single(&ChatRoomInsert {
             uuid: Uuid::new_v4(),
+            last_message_uuid: None,
         })
         .await?;
 
@@ -470,6 +471,7 @@ pub async fn start_game(
         .return_primary_key()
         .single(&ChatRoomInsert {
             uuid: Uuid::new_v4(),
+            last_message_uuid: None,
         })
         .await?;
 

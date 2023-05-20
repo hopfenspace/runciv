@@ -488,6 +488,7 @@ pub async fn accept_friend_request(
         .return_primary_key()
         .single(&ChatRoomInsert {
             uuid: Uuid::new_v4(),
+            last_message_uuid: None,
         })
         .await?;
 
