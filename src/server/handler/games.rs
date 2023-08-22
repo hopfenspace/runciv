@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
-use crate::models::Game;
+use crate::models::{Game, GameAccount};
 use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
 use crate::server::RuntimeSettings;
 
@@ -52,6 +52,7 @@ pub struct GameOverviewResponse {
     last_activity: DateTime<Utc>,
     last_player: AccountResponse,
     chat_room_uuid: Uuid,
+    players: Vec<AccountResponse>,
 }
 
 /// An overview of games a player participates in
@@ -84,8 +85,10 @@ pub async fn get_open_games(
 ) -> ApiResult<Json<GetGameOverviewResponse>> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
-    let open_games = query!(
-        db.as_ref(),
+    let mut tx = db.start_transaction().await?;
+
+    let mut open_games: Vec<GameOverviewResponse> = query!(
+        &mut tx,
         (
             Game::F.uuid,
             Game::F.data_id,
@@ -126,10 +129,32 @@ pub async fn get_open_games(
                     display_name: updated_by_display_name,
                 },
                 chat_room_uuid: *chat_room.key(),
+                players: vec![],
             }
         },
     )
     .collect();
+
+    for game in &mut open_games {
+        game.players.extend(
+            query!(
+                &mut tx,
+                (
+                    GameAccount::F.player.uuid,
+                    GameAccount::F.player.username,
+                    GameAccount::F.player.display_name
+                )
+            )
+            .all()
+            .await?
+            .into_iter()
+            .map(|(uuid, username, display_name)| AccountResponse {
+                uuid,
+                username,
+                display_name,
+            }),
+        );
+    }
 
     Ok(Json(GetGameOverviewResponse { games: open_games }))
 }
