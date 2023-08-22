@@ -145,6 +145,7 @@ pub async fn get_open_games(
                     GameAccount::F.player.display_name
                 )
             )
+            .condition(GameAccount::F.game.uuid.equals(game.game_uuid.as_ref()))
             .all()
             .await?
             .into_iter()
