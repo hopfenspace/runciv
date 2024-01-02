@@ -34,7 +34,7 @@ clap = { version = "~4", features = ["derive"] }
 serde = { version = "~1", features = ["derive"] }
 serde_repr = { version = "~0.1" }
 serde_json = { version = "~1", features = ["raw_value"] }
-toml = { version = "~0.7" }
+toml = { version = "~0.8" }
 # Time library
 chrono = { version = ">=0.4.20", default-features = false, features = ["serde"] }
 # Bytes abstractions for network usage
@@ -56,7 +56,7 @@ futures = { version = "~0.3" }
 futures-util = "0.3"
 
 # More iterators
-itertools = { version = "~0.11" }
+itertools = { version = "~0.12" }
 
 # Lazy initialization
 once_cell = { version = "~1" }
