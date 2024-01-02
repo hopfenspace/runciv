@@ -179,7 +179,7 @@ pub enum WsMessage {
     },
     /// The user account was updated.
     ///
-    /// This might me especially useful for reflecting changes in the username, etc. in the
+    /// This might be especially useful for reflecting changes in the username, etc. in the
     /// frontend
     AccountUpdated {
         /// The new account data

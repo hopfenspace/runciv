@@ -159,7 +159,7 @@ pub struct GetLobbyResponse {
     chat_room_uuid: Uuid,
 }
 
-/// Retrieves an open lobbies.
+/// Retrieves an open lobby
 ///
 /// If `password` is `true`, the lobby is secured by a user-set password
 #[utoipa::path(
@@ -946,7 +946,7 @@ pub struct PlayerKickPath {
 ///
 /// This endpoint can only be used by the lobby owner.
 ///
-/// All players in the lobby as well as the kick player will receive a [WsMessage::LobbyKick]
+/// All players in the lobby as well as the kicked player will receive a [WsMessage::LobbyKick]
 /// message via websocket on success.
 #[utoipa::path(
     tag = "Lobbies",
