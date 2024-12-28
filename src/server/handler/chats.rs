@@ -1,3 +1,5 @@
+//! Handler for chatting
+
 use std::cmp::Ordering;
 
 use actix_toolbox::tb_middleware::Session;
@@ -6,8 +8,8 @@ use actix_web::{get, post};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::warn;
-use rorm::fields::ForeignModelByField;
-use rorm::{and, insert, query, update, Database, Model};
+use rorm::fields::types::ForeignModelByField;
+use rorm::{and, insert, query, update, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -17,7 +19,7 @@ use crate::models::{
     ChatRoom, ChatRoomMember, ChatRoomMessage, ChatRoomMessageInsert, Friend, GameAccount,
     LobbyAccount,
 };
-use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
+use crate::server::handler::{AccountResponse, ApiError, ApiErrorResponse, ApiResult, PathUuid};
 
 /// The message of a chatroom
 ///
@@ -103,7 +105,7 @@ pub async fn get_chat(
     let mut tx = db.start_transaction().await?;
 
     query!(&mut tx, (ChatRoom::F.uuid,))
-        .condition(ChatRoom::F.uuid.equals(path.uuid.as_ref()))
+        .condition(ChatRoom::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -111,8 +113,8 @@ pub async fn get_chat(
     // Check if user is allowed to access chat data
     let user_count = query!(&mut tx, (ChatRoomMember::F.uuid.count(),))
         .condition(and!(
-            ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()),
-            ChatRoomMember::F.member.uuid.equals(uuid.as_ref())
+            ChatRoomMember::F.chat_room.equals(path.uuid),
+            ChatRoomMember::F.member.uuid.equals(uuid)
         ))
         .one()
         .await?
@@ -131,7 +133,7 @@ pub async fn get_chat(
             ChatRoomMember::F.member.display_name
         )
     )
-    .condition(ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()))
+    .condition(ChatRoomMember::F.chat_room.equals(path.uuid))
     .all()
     .await?;
 
@@ -146,7 +148,7 @@ pub async fn get_chat(
             ChatRoomMessage::F.sender.display_name
         )
     )
-    .condition(ChatRoomMessage::F.chat_room.equals(path.uuid.as_ref()))
+    .condition(ChatRoomMessage::F.chat_room.equals(path.uuid))
     .all()
     .await?;
 
@@ -160,7 +162,7 @@ pub async fn get_chat(
                     ChatMessage {
                         uuid,
                         message,
-                        created_at: DateTime::from_utc(created_at, Utc),
+                        created_at: DateTime::from_naive_utc_and_offset(created_at, Utc),
                         sender: AccountResponse {
                             uuid: sender_uuid,
                             username: sender_username,
@@ -175,7 +177,7 @@ pub async fn get_chat(
             .into_iter()
             .map(
                 |(created_at, m_uuid, m_username, m_display_name)| ChatMember {
-                    joined_at: DateTime::from_utc(created_at, Utc),
+                    joined_at: DateTime::from_naive_utc_and_offset(created_at, Utc),
                     account: AccountResponse {
                         uuid: m_uuid,
                         username: m_username,
@@ -226,7 +228,7 @@ pub async fn get_all_chats(
     )
     .condition(and!(
         Friend::F.is_request.equals(false),
-        Friend::F.from.uuid.equals(uuid.as_ref())
+        Friend::F.from.uuid.equals(uuid)
     ))
     .all()
     .await?;
@@ -238,7 +240,7 @@ pub async fn get_all_chats(
             LobbyAccount::F.lobby.chat_room.last_message_uuid
         )
     )
-    .condition(LobbyAccount::F.player.uuid.equals(uuid.as_ref()))
+    .condition(LobbyAccount::F.player.uuid.equals(uuid))
     .all()
     .await?;
 
@@ -249,7 +251,7 @@ pub async fn get_all_chats(
             GameAccount::F.game.chat_room.last_message_uuid
         )
     )
-    .condition(GameAccount::F.uuid.equals(uuid.as_ref()))
+    .condition(GameAccount::F.uuid.equals(uuid))
     .all()
     .await?;
 
@@ -329,8 +331,8 @@ pub async fn send_message(
         )
     )
     .condition(and!(
-        ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()),
-        ChatRoomMember::F.member.equals(uuid.as_ref())
+        ChatRoomMember::F.chat_room.equals(path.uuid),
+        ChatRoomMember::F.member.equals(uuid)
     ))
     .optional()
     .await?
@@ -347,16 +349,13 @@ pub async fn send_message(
         .await?;
 
     update!(&mut tx, ChatRoom)
-        .condition(ChatRoom::F.uuid.equals(path.uuid.as_ref()))
-        .set(
-            ChatRoom::F.last_message_uuid,
-            Some(chat_room_message.uuid.as_ref()),
-        )
+        .condition(ChatRoom::F.uuid.equals(path.uuid))
+        .set(ChatRoom::F.last_message_uuid, Some(chat_room_message.uuid))
         .exec()
         .await?;
 
     let chat_room_members = query!(&mut tx, (ChatRoomMember::F.member.uuid,))
-        .condition(ChatRoomMember::F.chat_room.equals(path.uuid.as_ref()))
+        .condition(ChatRoomMember::F.chat_room.equals(path.uuid))
         .all()
         .await?;
 
@@ -370,7 +369,7 @@ pub async fn send_message(
             display_name: sender_display_name,
             username: sender_username,
         },
-        created_at: DateTime::from_utc(chat_room_message.created_at, Utc),
+        created_at: DateTime::from_naive_utc_and_offset(chat_room_message.created_at, Utc),
     };
 
     let msg = WsMessage::IncomingChatMessage {

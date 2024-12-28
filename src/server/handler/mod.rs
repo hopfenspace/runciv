@@ -23,17 +23,17 @@ pub use crate::server::handler::version::*;
 pub use crate::server::handler::websocket::*;
 pub use crate::server::handler::welcome_page::*;
 
-mod accounts;
-mod auth;
-mod chats;
-mod friends;
-mod games;
-mod health;
-mod invites;
-mod lobbies;
-mod version;
-mod websocket;
-mod welcome_page;
+pub mod accounts;
+pub mod auth;
+pub mod chats;
+pub mod friends;
+pub mod games;
+pub mod health;
+pub mod invites;
+pub mod lobbies;
+pub mod version;
+pub mod websocket;
+pub mod welcome_page;
 
 /// The uuid in a path
 #[derive(Deserialize, IntoParams)]

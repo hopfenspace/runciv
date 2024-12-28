@@ -7,14 +7,14 @@ use argon2::password_hash::{Error, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use log::{error, warn};
 use rand::thread_rng;
-use rorm::{insert, query, update, Database, Model};
+use rorm::{insert, query, update, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{Account, AccountInsert};
-use crate::server::handler::{ApiError, ApiResult, PathUuid};
+use crate::server::handler::{ApiError, ApiErrorResponse, ApiResult, PathUuid};
 
 /// The content to register a new account
 #[derive(Debug, Deserialize, ToSchema)]
@@ -119,7 +119,7 @@ pub async fn get_me(db: Data<Database>, session: Session) -> ApiResult<Json<Acco
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
     let account = query!(db.as_ref(), Account)
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
+        .condition(Account::F.uuid.equals(uuid))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
@@ -150,8 +150,10 @@ pub async fn delete_me(
 ) -> ApiResult<HttpResponse> {
     let uuid: Uuid = session.get("uuid")?.ok_or(ApiError::SessionCorrupt)?;
 
-    rorm::delete!(db.as_ref(), Account)
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
+    let db = db.into_inner();
+
+    rorm::delete!(&*db, Account)
+        .condition(Account::F.uuid.equals(uuid))
         .await?;
 
     // Clear the current session
@@ -206,7 +208,7 @@ pub async fn set_password(
     let mut tx = db.start_transaction().await?;
 
     let (pw_hash,) = query!(&mut tx, (Account::F.password_hash,))
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
+        .condition(Account::F.uuid.equals(uuid))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
@@ -224,8 +226,8 @@ pub async fn set_password(
         .to_string();
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
-        .set(Account::F.password_hash, &password_hash)
+        .condition(Account::F.uuid.equals(uuid))
+        .set(Account::F.password_hash, password_hash)
         .exec()
         .await?;
 
@@ -264,7 +266,10 @@ pub struct UpdateAccountRequest {
 )]
 #[put("/accounts/me")]
 pub async fn update_me(
-    req: Json<UpdateAccountRequest>,
+    Json(UpdateAccountRequest {
+        username,
+        display_name,
+    }): Json<UpdateAccountRequest>,
     db: Data<Database>,
     session: Session,
     ws_manager_chan: Data<WsManagerChan>,
@@ -273,7 +278,7 @@ pub async fn update_me(
 
     let mut tx = db.start_transaction().await?;
 
-    if let Some(username) = &req.username {
+    if let Some(username) = &username {
         if username.is_empty() {
             return Err(ApiError::InvalidUsername);
         }
@@ -288,17 +293,17 @@ pub async fn update_me(
         }
     }
 
-    if let Some(display_name) = &req.display_name {
+    if let Some(display_name) = &display_name {
         if display_name.is_empty() {
             return Err(ApiError::InvalidDisplayName);
         }
     }
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
+        .condition(Account::F.uuid.equals(uuid))
         .begin_dyn_set()
-        .set_if(Account::F.username, req.username.as_ref())
-        .set_if(Account::F.display_name, req.display_name.as_ref())
+        .set_if(Account::F.username, username)
+        .set_if(Account::F.display_name, display_name)
         .finish_dyn_set()
         .map_err(|_| ApiError::EmptyJson)?
         .exec()
@@ -312,7 +317,7 @@ pub async fn update_me(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .condition(Account::F.uuid.equals(uuid))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
@@ -359,8 +364,8 @@ pub async fn lookup_account_by_uuid(
     req: Path<PathUuid>,
     db: Data<Database>,
 ) -> ApiResult<Json<AccountResponse>> {
-    let account = query!(db.as_ref(), Account)
-        .condition(Account::F.uuid.equals(req.uuid.as_ref()))
+    let account = query!(&**db, Account)
+        .condition(Account::F.uuid.equals(req.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -404,7 +409,7 @@ pub async fn lookup_account_by_username(
     req: Json<LookupAccountUsernameRequest>,
     db: Data<Database>,
 ) -> ApiResult<Json<AccountResponse>> {
-    let account = query!(db.as_ref(), Account)
+    let account = query!(&**db, Account)
         .condition(Account::F.username.equals(&req.username))
         .optional()
         .await?

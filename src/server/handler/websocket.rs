@@ -1,3 +1,5 @@
+//! Websocket handler
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -15,7 +17,7 @@ use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::invalid_msg;
-use crate::server::handler::ApiError;
+use crate::server::handler::{ApiError, ApiErrorResponse};
 
 struct CommonMessages {
     invalid_message: ByteString,

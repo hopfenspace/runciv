@@ -1,3 +1,5 @@
+//! Handler to determine the version running on the server
+
 use actix_web::get;
 use actix_web::web::Json;
 use serde::Serialize;

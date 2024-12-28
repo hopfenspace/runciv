@@ -1,3 +1,5 @@
+//! Handler for invites
+
 use std::iter;
 
 use actix_toolbox::tb_middleware::Session;
@@ -5,8 +7,8 @@ use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, HttpResponse};
 use chrono::{DateTime, Utc};
 use log::{error, warn};
-use rorm::fields::ForeignModelByField;
-use rorm::{and, insert, query, Database, Model};
+use rorm::fields::types::ForeignModelByField;
+use rorm::{and, insert, query, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use utoipa::ToSchema;
@@ -17,7 +19,7 @@ use crate::models::{
     Account, ChatRoomMemberInsert, Friend, Invite, InviteInsert, Lobby, LobbyAccount,
     LobbyAccountInsert,
 };
-use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
+use crate::server::handler::{AccountResponse, ApiError, ApiErrorResponse, ApiResult, PathUuid};
 
 /// The request to invite a friend into a lobby
 #[derive(Deserialize, ToSchema)]
@@ -54,7 +56,7 @@ pub async fn create_invite(
 
     // Check if lobby is currently open
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(req.lobby_uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(req.lobby_uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidLobbyUuid)?;
@@ -67,8 +69,8 @@ pub async fn create_invite(
     if *lobby.owner.key() != uuid
         && query!(&mut tx, LobbyAccount)
             .condition(and!(
-                LobbyAccount::F.lobby.equals(lobby.uuid.as_ref()),
-                LobbyAccount::F.player.equals(uuid.as_ref())
+                LobbyAccount::F.lobby.equals(lobby.uuid),
+                LobbyAccount::F.player.equals(uuid)
             ))
             .optional()
             .await?
@@ -79,7 +81,7 @@ pub async fn create_invite(
 
     // Check if specified friend is valid
     let friend_account = query!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(req.friend_uuid.as_ref()))
+        .condition(Account::F.uuid.equals(req.friend_uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -88,8 +90,8 @@ pub async fn create_invite(
     let friend = query!(&mut tx, Friend)
         .condition(and!(
             Friend::F.is_request.equals(false),
-            Friend::F.from.equals(uuid.as_ref()),
-            Friend::F.to.equals(friend_account.uuid.as_ref())
+            Friend::F.from.equals(uuid),
+            Friend::F.to.equals(friend_account.uuid)
         ))
         .optional()
         .await?
@@ -122,7 +124,7 @@ pub async fn create_invite(
         .await?;
 
     let executing_account = query!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(uuid.as_ref()))
+        .condition(Account::F.uuid.equals(uuid))
         .optional()
         .await?
         .ok_or(ApiError::SessionCorrupt)?;
@@ -193,7 +195,7 @@ pub async fn get_invites(
             Invite::F.created_at
         )
     )
-    .condition(Invite::F.to.equals(uuid.as_ref()))
+    .condition(Invite::F.to.equals(uuid))
     .all()
     .await?;
 
@@ -205,7 +207,7 @@ pub async fn get_invites(
                     GetInvite {
                         uuid,
                         lobby_uuid,
-                        created_at: DateTime::from_utc(created_at, Utc),
+                        created_at: DateTime::from_naive_utc_and_offset(created_at, Utc),
                         from: AccountResponse {
                             uuid: from_uuid,
                             username: from_username,
@@ -244,7 +246,7 @@ pub async fn delete_invite(
     let mut tx = db.start_transaction().await?;
 
     let invite = query!(&mut tx, Invite)
-        .condition(Invite::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Invite::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -294,7 +296,7 @@ pub async fn accept_invite(
 
     // Check if the invite exists
     let invite = query!(&mut tx, Invite)
-        .condition(Invite::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Invite::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -305,7 +307,7 @@ pub async fn accept_invite(
     }
 
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(LobbyAccount::F.lobby.equals(invite.lobby.key().as_ref()))
+        .condition(LobbyAccount::F.lobby.equals(*invite.lobby.key()))
         .optional()
         .await?
         .ok_or(ApiError::InternalServerError)?;
@@ -376,7 +378,7 @@ pub async fn accept_invite(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(invite.to.key().as_ref()))
+    .condition(Account::F.uuid.equals(*invite.to.key()))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;

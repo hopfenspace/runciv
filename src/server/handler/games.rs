@@ -1,3 +1,5 @@
+//! Handler for games
+
 use std::path::Path as StdPath;
 
 use actix_toolbox::tb_middleware::Session;
@@ -5,7 +7,8 @@ use actix_web::web::{Data, Json, Path};
 use actix_web::{get, put};
 use chrono::{DateTime, Utc};
 use log::{debug, error, warn};
-use rorm::{and, query, update, Database, Model};
+use rorm::fields::types::ForeignModelByField;
+use rorm::{and, query, update, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use tokio::fs::{read_to_string, remove_file, write};
 use utoipa::ToSchema;
@@ -13,7 +16,7 @@ use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage, WsMessage};
 use crate::models::{Game, GameAccount};
-use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
+use crate::server::handler::{AccountResponse, ApiError, ApiErrorResponse, ApiResult, PathUuid};
 use crate::server::RuntimeSettings;
 
 /// A single game state identified by its Uuid and state identifier
@@ -101,7 +104,7 @@ pub async fn get_open_games(
             Game::F.chat_room,
         )
     )
-    .condition(Game::F.current_players.player.equals(uuid.as_ref()))
+    .condition(Game::F.current_players.player.equals(uuid))
     .all()
     .await?
     .into_iter()
@@ -122,7 +125,7 @@ pub async fn get_open_games(
                 game_data_id: data_id as u64,
                 name,
                 max_players,
-                last_activity: DateTime::from_utc(updated_at, Utc),
+                last_activity: DateTime::from_naive_utc_and_offset(updated_at, Utc),
                 last_player: AccountResponse {
                     uuid: updated_by_uuid,
                     username: updated_by_username,
@@ -145,7 +148,7 @@ pub async fn get_open_games(
                     GameAccount::F.player.display_name
                 )
             )
-            .condition(GameAccount::F.game.uuid.equals(game.game_uuid.as_ref()))
+            .condition(GameAccount::F.game.uuid.equals(game.game_uuid))
             .all()
             .await?
             .into_iter()
@@ -208,8 +211,8 @@ pub async fn get_game(
         )
     )
     .condition(and!(
-        Game::F.uuid.equals(game_uuid.as_ref()),
-        Game::F.current_players.player.uuid.equals(uuid.as_ref())
+        Game::F.uuid.equals(game_uuid),
+        Game::F.current_players.player.uuid.equals(uuid)
     ))
     .optional()
     .await?
@@ -229,7 +232,7 @@ pub async fn get_game(
         game_data_id: data_id as u64,
         name,
         max_players,
-        last_activity: DateTime::from_utc(updated_at, Utc),
+        last_activity: DateTime::from_naive_utc_and_offset(updated_at, Utc),
         last_player: AccountResponse {
             uuid: updated_by_uuid,
             username: updated_by_username.to_string(),
@@ -285,8 +288,8 @@ pub async fn push_game_update(
     // Lookup the game and verify that the player is actually participating in it
     let mut game = query!(&mut tx, Game)
         .condition(and!(
-            Game::F.uuid.equals(game_uuid.as_ref()),
-            Game::F.current_players.player.uuid.equals(uuid.as_ref())
+            Game::F.uuid.equals(game_uuid),
+            Game::F.current_players.player.uuid.equals(uuid)
         ))
         .optional()
         .await?
@@ -319,8 +322,8 @@ pub async fn push_game_update(
     // which also updates the last access time automatically
     update!(&mut tx, Game)
         .set(Game::F.data_id, new_data_id)
-        .set(Game::F.updated_by, uuid.as_ref())
-        .condition(Game::F.uuid.equals(game_uuid.as_ref()))
+        .set(Game::F.updated_by, ForeignModelByField::Key(uuid))
+        .condition(Game::F.uuid.equals(game_uuid))
         .await?;
 
     tx.commit().await?;

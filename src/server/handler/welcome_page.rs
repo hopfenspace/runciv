@@ -1,3 +1,5 @@
+//! Static file serving
+
 use actix_web::{get, HttpResponse};
 
 #[get("/")]

@@ -4,7 +4,7 @@ use std::iter;
 use actix_toolbox::ws;
 use actix_toolbox::ws::{MailboxError, Message};
 use log::{debug, error, info, warn};
-use rorm::{and, delete, query, Database, Model};
+use rorm::{and, delete, query, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
@@ -246,7 +246,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
 
                         let (username, display_name) =
                             match query!(&mut tx, (Account::F.username, Account::F.display_name))
-                                .condition(Account::F.uuid.equals(uuid.as_ref()))
+                                .condition(Account::F.uuid.equals(uuid))
                                 .one()
                                 .await
                             {
@@ -278,9 +278,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                                     }
 
                                     if let Err(err) = delete!(&mut tx, ChatRoom)
-                                        .condition(
-                                            ChatRoom::F.uuid.equals(lobby.chat_room.key().as_ref()),
-                                        )
+                                        .condition(ChatRoom::F.uuid.equals(*lobby.chat_room.key()))
                                         .await
                                     {
                                         error!("Database error: {err}");
@@ -288,7 +286,7 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                                     }
 
                                     if let Err(err) = delete!(&mut tx, Lobby)
-                                        .condition(Lobby::F.uuid.equals(lobby.uuid.as_ref()))
+                                        .condition(Lobby::F.uuid.equals(lobby.uuid))
                                         .await
                                     {
                                         error!("Database error: {err}");
@@ -319,18 +317,14 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
                         }
 
                         match query!(&mut tx, LobbyAccount)
-                            .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
+                            .condition(LobbyAccount::F.player.equals(uuid))
                             .all()
                             .await
                         {
                             Ok(lobby_accounts) => {
                                 for lobby_account in lobby_accounts {
                                     let mut lobby = match query!(&mut tx, Lobby)
-                                        .condition(
-                                            Lobby::F
-                                                .uuid
-                                                .equals(lobby_account.lobby.key().as_ref()),
-                                        )
+                                        .condition(Lobby::F.uuid.equals(*lobby_account.lobby.key()))
                                         .one()
                                         .await
                                     {
@@ -350,10 +344,10 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
 
                                     if let Err(err) = delete!(&mut tx, ChatRoomMember)
                                         .condition(and!(
-                                            ChatRoomMember::F.member.equals(uuid.as_ref()),
+                                            ChatRoomMember::F.member.equals(uuid),
                                             ChatRoomMember::F
                                                 .chat_room
-                                                .equals(lobby.chat_room.key().as_ref())
+                                                .equals(lobby.chat_room.key())
                                         ))
                                         .await
                                     {
@@ -363,8 +357,8 @@ pub async fn start_ws_manager(db: Database) -> Result<WsManagerChan, String> {
 
                                     if let Err(err) = delete!(&mut tx, LobbyAccount)
                                         .condition(and!(
-                                            LobbyAccount::F.player.equals(uuid.as_ref()),
-                                            LobbyAccount::F.lobby.equals(lobby.uuid.as_ref())
+                                            LobbyAccount::F.player.equals(uuid),
+                                            LobbyAccount::F.lobby.equals(lobby.uuid)
                                         ))
                                         .await
                                     {

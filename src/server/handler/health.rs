@@ -1,3 +1,5 @@
+//! Handler for server health endpoints
+
 use actix_web::get;
 use actix_web::web::{Data, Json};
 use log::error;
@@ -8,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::Account;
-use crate::server::handler::{ApiError, ApiResult};
+use crate::server::handler::{ApiError, ApiErrorResponse, ApiResult};
 
 /// The health data of this server
 #[derive(Serialize, ToSchema)]

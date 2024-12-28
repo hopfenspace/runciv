@@ -1,4 +1,4 @@
-use rorm::fields::{BackRef, ForeignModel};
+use rorm::fields::types::{BackRef, ForeignModel};
 use rorm::{field, Model, Patch};
 use uuid::Uuid;
 

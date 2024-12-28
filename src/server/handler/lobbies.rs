@@ -1,3 +1,5 @@
+//! Handler for lobbies
+
 use std::iter;
 
 use actix_toolbox::tb_middleware::Session;
@@ -8,8 +10,8 @@ use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Utc};
 use log::{error, warn};
 use rand::thread_rng;
-use rorm::fields::{BackRef, ForeignModelByField};
-use rorm::{and, insert, query, update, Database, Model};
+use rorm::fields::types::{BackRef, ForeignModelByField};
+use rorm::{and, insert, query, update, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use utoipa::{IntoParams, ToSchema};
@@ -20,7 +22,7 @@ use crate::models::{
     Account, ChatRoomInsert, ChatRoomMember, ChatRoomMemberInsert, ChatRoomMessage,
     GameAccountInsert, GameInsert, Invite, Lobby, LobbyAccount, LobbyAccountInsert, LobbyInsert,
 };
-use crate::server::handler::{AccountResponse, ApiError, ApiResult, PathUuid};
+use crate::server::handler::{AccountResponse, ApiError, ApiErrorResponse, ApiResult, PathUuid};
 
 /// A single lobby
 #[derive(Serialize, ToSchema)]
@@ -136,7 +138,7 @@ pub async fn get_all_lobbies(db: Data<Database>) -> ApiResult<Json<GetLobbiesRes
                     current_players: l.current_player.cached.unwrap().len() as u8 + 1,
                     max_players: l.max_player as u8,
                     password: l.password_hash.is_some(),
-                    created_at: DateTime::from_utc(l.created_at, Utc),
+                    created_at: DateTime::from_naive_utc_and_offset(l.created_at, Utc),
                     chat_room_uuid: *l.chat_room.key(),
                 }
             })
@@ -204,7 +206,7 @@ pub async fn get_lobby(
             Lobby::F.chat_room.uuid,
         )
     )
-    .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+    .condition(Lobby::F.uuid.equals(path.uuid))
     .optional()
     .await?
     .ok_or(ApiError::InvalidUuid)?;
@@ -217,7 +219,7 @@ pub async fn get_lobby(
             LobbyAccount::F.player.display_name,
         )
     )
-    .condition(LobbyAccount::F.lobby.equals(uuid.as_ref()))
+    .condition(LobbyAccount::F.lobby.equals(uuid))
     .all()
     .await?;
 
@@ -243,7 +245,7 @@ pub async fn get_lobby(
             .collect(),
         max_players: max_player as u8,
         password: password_hash.is_some(),
-        created_at: DateTime::from_utc(created_at, Utc),
+        created_at: DateTime::from_naive_utc_and_offset(created_at, Utc),
         chat_room_uuid,
     }))
 }
@@ -329,7 +331,7 @@ pub async fn create_lobby(
 
     // Check if the executing account is already in a lobby
     if query!(&mut tx, (LobbyAccount::F.uuid,))
-        .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
+        .condition(LobbyAccount::F.player.equals(uuid))
         .optional()
         .await?
         .is_some()
@@ -338,7 +340,7 @@ pub async fn create_lobby(
     }
 
     if query!(&mut tx, (Lobby::F.uuid,))
-        .condition(Lobby::F.owner.equals(uuid.as_ref()))
+        .condition(Lobby::F.owner.equals(uuid))
         .optional()
         .await?
         .is_some()
@@ -451,7 +453,7 @@ pub async fn start_game(
     let mut tx = db.start_transaction().await?;
 
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -477,23 +479,21 @@ pub async fn start_game(
 
     // Move messages from lobby chat to game chat
     update!(&mut tx, ChatRoomMessage)
-        .condition(
-            ChatRoomMessage::F
-                .chat_room
-                .equals(lobby.chat_room.key().as_ref()),
+        .condition(ChatRoomMessage::F.chat_room.equals(*lobby.chat_room.key()))
+        .set(
+            ChatRoomMessage::F.chat_room,
+            ForeignModelByField::Key(game_chat_uuid),
         )
-        .set(ChatRoomMessage::F.chat_room, game_chat_uuid.as_ref())
         .exec()
         .await?;
 
     // Move chatroom member to new chatroom
     update!(&mut tx, ChatRoomMember)
-        .condition(
-            ChatRoomMember::F
-                .chat_room
-                .equals(lobby.chat_room.key().as_ref()),
+        .condition(ChatRoomMember::F.chat_room.equals(*lobby.chat_room.key()))
+        .set(
+            ChatRoomMember::F.chat_room,
+            ForeignModelByField::Key(game_chat_uuid),
         )
-        .set(ChatRoomMember::F.chat_room, game_chat_uuid.as_ref())
         .exec()
         .await?;
 
@@ -547,7 +547,7 @@ pub async fn start_game(
 
     // Delete lobby
     rorm::delete!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid))
         .await?;
 
     tx.commit().await?;
@@ -622,7 +622,7 @@ pub async fn join_lobby(
 
     // Check if lobby exists
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -644,7 +644,7 @@ pub async fn join_lobby(
 
     // Check if the executing account is already in a lobby
     if query!(&mut tx, (LobbyAccount::F.uuid,))
-        .condition(LobbyAccount::F.player.equals(uuid.as_ref()))
+        .condition(LobbyAccount::F.player.equals(uuid))
         .optional()
         .await?
         .is_some()
@@ -653,7 +653,7 @@ pub async fn join_lobby(
     }
 
     if query!(&mut tx, (Lobby::F.uuid,))
-        .condition(Lobby::F.owner.equals(uuid.as_ref()))
+        .condition(Lobby::F.owner.equals(uuid))
         .optional()
         .await?
         .is_some()
@@ -711,7 +711,7 @@ pub async fn join_lobby(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .condition(Account::F.uuid.equals(uuid))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
@@ -783,7 +783,7 @@ pub async fn close_lobby(
 
     // Check if lobby exists
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -803,7 +803,7 @@ pub async fn close_lobby(
     }
 
     rorm::delete!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(lobby.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(lobby.uuid))
         .await?;
 
     tx.commit().await?;
@@ -855,7 +855,7 @@ pub async fn leave_lobby(
 
     // Check if lobby exists
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -876,23 +876,21 @@ pub async fn leave_lobby(
 
     rorm::delete!(&mut tx, LobbyAccount)
         .condition(and!(
-            LobbyAccount::F.lobby.equals(lobby.uuid.as_ref()),
-            LobbyAccount::F.player.equals(uuid.as_ref())
+            LobbyAccount::F.lobby.equals(lobby.uuid),
+            LobbyAccount::F.player.equals(uuid)
         ))
         .await?;
 
     rorm::delete!(&mut tx, ChatRoomMember)
         .condition(and!(
-            ChatRoomMember::F
-                .chat_room
-                .equals(lobby.chat_room.key().as_ref()),
-            ChatRoomMember::F.member.equals(uuid.as_ref())
+            ChatRoomMember::F.chat_room.equals(lobby.chat_room.key()),
+            ChatRoomMember::F.member.equals(uuid)
         ))
         .await?;
 
     // Delete all invites of this player
     rorm::delete!(&mut tx, Invite)
-        .condition(Invite::F.from.equals(uuid.as_ref()))
+        .condition(Invite::F.from.equals(uuid))
         .await?;
 
     let (uuid, username, display_name) = query!(
@@ -903,7 +901,7 @@ pub async fn leave_lobby(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .condition(Account::F.uuid.equals(uuid))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
@@ -972,7 +970,7 @@ pub async fn kick_player_from_lobby(
 
     // Check if lobby exists
     let mut lobby = query!(&mut tx, Lobby)
-        .condition(Lobby::F.uuid.equals(path.lobby_uuid.as_ref()))
+        .condition(Lobby::F.uuid.equals(path.lobby_uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -1001,23 +999,21 @@ pub async fn kick_player_from_lobby(
 
     rorm::delete!(&mut tx, LobbyAccount)
         .condition(and!(
-            LobbyAccount::F.lobby.equals(lobby.uuid.as_ref()),
-            LobbyAccount::F.player.equals(path.player_uuid.as_ref())
+            LobbyAccount::F.lobby.equals(lobby.uuid),
+            LobbyAccount::F.player.equals(path.player_uuid)
         ))
         .await?;
 
     rorm::delete!(&mut tx, ChatRoomMember)
         .condition(and!(
-            ChatRoomMember::F
-                .chat_room
-                .equals(lobby.chat_room.key().as_ref()),
-            ChatRoomMember::F.member.equals(path.player_uuid.as_ref()),
+            ChatRoomMember::F.chat_room.equals(lobby.chat_room.key()),
+            ChatRoomMember::F.member.equals(path.player_uuid),
         ))
         .await?;
 
     // Delete all invites of this player
     rorm::delete!(&mut tx, Invite)
-        .condition(Invite::F.from.equals(path.player_uuid.as_ref()))
+        .condition(Invite::F.from.equals(path.player_uuid))
         .await?;
 
     let (uuid, username, display_name) = query!(
@@ -1028,7 +1024,7 @@ pub async fn kick_player_from_lobby(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(path.player_uuid.as_ref()))
+    .condition(Account::F.uuid.equals(path.player_uuid))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;

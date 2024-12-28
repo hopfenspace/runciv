@@ -1,9 +1,11 @@
+//! Handler for friends
+
 use actix_toolbox::tb_middleware::Session;
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, put, HttpResponse};
 use log::{error, warn};
-use rorm::fields::ForeignModelByField;
-use rorm::{and, insert, or, query, update, Database, Model};
+use rorm::fields::types::ForeignModelByField;
+use rorm::{and, insert, or, query, update, Database, FieldAccess, Model};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use utoipa::ToSchema;
@@ -15,7 +17,7 @@ use crate::models::{
     FriendWithChatInsert,
 };
 use crate::server::handler::{
-    AccountResponse, ApiError, ApiResult, OnlineAccountResponse, PathUuid,
+    AccountResponse, ApiError, ApiErrorResponse, ApiResult, OnlineAccountResponse, PathUuid,
 };
 
 /// A single friend
@@ -279,7 +281,7 @@ pub async fn create_friend_request(
 
     // Check if target exists
     let target = query!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(req.uuid.as_bytes().as_slice()))
+        .condition(Account::F.uuid.equals(req.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -324,7 +326,7 @@ pub async fn create_friend_request(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(uuid.as_ref()))
+    .condition(Account::F.uuid.equals(uuid))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
@@ -374,7 +376,7 @@ pub async fn delete_friend(
 
     // Check if friend exists
     let f = query!(&mut tx, Friend)
-        .condition(Friend::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Friend::F.uuid.equals(path.uuid))
         .optional()
         .await?
         .ok_or(ApiError::InvalidUuid)?;
@@ -386,17 +388,17 @@ pub async fn delete_friend(
 
     rorm::delete!(&mut tx, Friend)
         .condition(or!(
-            Friend::F.uuid.equals(f.uuid.as_ref()),
+            Friend::F.uuid.equals(f.uuid),
             and!(
-                Friend::F.to.equals(f.from.key().as_ref()),
-                Friend::F.from.equals(f.to.key().as_ref())
+                Friend::F.to.equals(f.from.key()),
+                Friend::F.from.equals(f.to.key())
             )
         ))
         .await?;
 
     if let Some(chat_room) = f.chat_room {
         rorm::delete!(&mut tx, ChatRoom)
-            .condition(ChatRoom::F.uuid.equals(chat_room.key().as_ref()))
+            .condition(ChatRoom::F.uuid.equals(*chat_room.key()))
             .await?;
     }
 
@@ -414,7 +416,7 @@ pub async fn delete_friend(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(other_party.as_ref()))
+    .condition(Account::F.uuid.equals(other_party))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;
@@ -471,7 +473,7 @@ pub async fn accept_friend_request(
     // Check if friend request exists
     let f = query!(&mut tx, Friend)
         .condition(and!(
-            Friend::F.uuid.equals(path.uuid.as_ref()),
+            Friend::F.uuid.equals(path.uuid),
             Friend::F.is_request.equals(true)
         ))
         .optional()
@@ -508,9 +510,12 @@ pub async fn accept_friend_request(
         .await?;
 
     update!(&mut tx, Friend)
-        .condition(Friend::F.uuid.equals(path.uuid.as_ref()))
+        .condition(Friend::F.uuid.equals(path.uuid))
         .set(Friend::F.is_request, false)
-        .set(Friend::F.chat_room, Some(chat_room_uuid.as_ref()))
+        .set(
+            Friend::F.chat_room,
+            Some(ForeignModelByField::Key(chat_room_uuid)),
+        )
         .exec()
         .await?;
 
@@ -532,7 +537,7 @@ pub async fn accept_friend_request(
             Account::F.display_name
         )
     )
-    .condition(Account::F.uuid.equals(f.to.key().as_ref()))
+    .condition(Account::F.uuid.equals(*f.to.key()))
     .optional()
     .await?
     .ok_or(ApiError::SessionCorrupt)?;

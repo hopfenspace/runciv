@@ -7,14 +7,14 @@ use argon2::password_hash::Error;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use chrono::Utc;
 use log::error;
-use rorm::{query, update, Database, Model};
+use rorm::{query, update, Database, FieldAccess, Model};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::chan::{WsManagerChan, WsManagerMessage};
 use crate::models::Account;
-use crate::server::handler::{ApiError, ApiResult};
+use crate::server::handler::{ApiError, ApiErrorResponse, ApiResult};
 
 /// The request data of a login request
 #[derive(ToSchema, Deserialize)]
@@ -63,7 +63,7 @@ pub(crate) async fn login(
         })?;
 
     update!(&mut tx, Account)
-        .condition(Account::F.uuid.equals(user.uuid.as_ref()))
+        .condition(Account::F.uuid.equals(user.uuid))
         .set(Account::F.last_login, Some(Utc::now().naive_utc()))
         .exec()
         .await?;
